@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sabaq v3 — Quran Memorization Coach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'%3E%3Crect width='44' height='44' rx='10' fill='%230B3D2E'/%3E%3Cg fill='%23C5A059'%3E%3Crect x='8' y='18' width='3' height='8' rx='1.5'/%3E%3Crect x='13' y='13' width='3' height='18' rx='1.5'/%3E%3Crect x='18' y='9' width='3' height='26' rx='1.5'/%3E%3Crect x='23' y='14' width='3' height='16' rx='1.5'/%3E%3Crect x='28' y='10' width='3' height='24' rx='1.5'/%3E%3Crect x='33' y='17' width='3' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E" />
+<meta name="description" content="Sabaq — the first multi interactive AI Quranic platform. Read, listen to your teacher, and memorize. Web version 3." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,600;6..72,700&family=Amiri+Quran&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg class="logo-svg" viewBox="0 0 44 44" role="img" aria-label="Sabaq logo">
+        <rect width="44" height="44" rx="10" fill="#12513D" />
+        <g fill="#C5A059">
+          <rect x="8" y="18" width="3" height="8" rx="1.5" />
+          <rect x="13" y="13" width="3" height="18" rx="1.5" />
+          <rect x="18" y="9" width="3" height="26" rx="1.5" />
+          <rect x="23" y="14" width="3" height="16" rx="1.5" />
+          <rect x="28" y="10" width="3" height="24" rx="1.5" />
+          <rect x="33" y="17" width="3" height="10" rx="1.5" />
+        </g>
+      </svg>
+    </span>
+    <span class="brand-text">
+      <span class="brand-name">Sabaq</span>
+      <span class="brand-tag">Quran Platform</span>
+    </span>
+  </div>
+  <span class="qiraat-pill" id="qiraatPill">Reading: —</span>
+</header>
+
+<main class="app" id="app">
+
+  <div class="load-error" id="loadError" hidden>
+    <strong>Sabaq could not load its Quran text.</strong><br />
+    This app needs to be served over HTTP — it does not work when opened straight from a file.
+    Please serve this folder with a local server, for example run
+    <code>python3 -m http.server 8000</code> inside the folder, then open
+    <code>http://localhost:8000</code> in your browser.
+  </div>
+
+  <!-- ============ SCREEN 1 — HOME / MODE PICKER ============ -->
+  <section class="screen is-active" id="screen-home" data-screen="home" aria-label="Home — who is learning">
+    <h1 class="screen-title">Who is learning today?</h1>
+    <p class="screen-sub">Tap one. No typing, no forms.</p>
+
+    <div class="mode-grid">
+      <button class="mode-card" type="button" data-mode="beginner">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z" /><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z" /></svg>
+        </span>
+        <span class="mode-name">Beginner</span>
+        <span class="mode-sub">I&rsquo;m starting &middot; Letters first</span>
+      </button>
+
+      <button class="mode-card" type="button" data-mode="returner">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
+        </span>
+        <span class="mode-name">Returner</span>
+        <span class="mode-sub">I&rsquo;m returning &middot; Quick level check</span>
+      </button>
+
+      <button class="mode-card" type="button" data-mode="adult">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" /></svg>
+        </span>
+        <span class="mode-name">Adult</span>
+        <span class="mode-sub">I&rsquo;m memorizing &middot; My daily plan</span>
+      </button>
+
+      <button class="mode-card" type="button" data-mode="parent">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5" /><circle cx="17.5" cy="9" r="2.5" /><path d="M16 14.7c2.8.3 5 2 5 4.3" /></svg>
+        </span>
+        <span class="mode-name">Parent / Family</span>
+        <span class="mode-sub">My child &middot; I follow along</span>
+      </button>
+    </div>
+
+    <p class="hint">Your pick shapes today&rsquo;s plan.</p>
+    <button class="ghost-btn" type="button" data-goto="surahs">Read the Quran &rarr;</button>
+  </section>
+
+  <!-- ============ SCREEN 2 — QIRA'AT PICKER ============ -->
+  <section class="screen" id="screen-qiraat" data-screen="qiraat" aria-label="Qira'at picker">
+    <button class="back-btn" type="button" data-goto="home">&larr; Back</button>
+    <h1 class="screen-title">How do you read?</h1>
+    <p class="screen-sub">Pick your reading. We check you against it.</p>
+
+    <div class="qiraat-grid">
+      <button class="qiraat-card" type="button" data-qiraat="hafs">
+        <span class="qiraat-name">Hafs</span>
+        <span class="qiraat-sub">The most common reading</span>
+      </button>
+
+      <button class="qiraat-card" type="button" data-qiraat="warsh">
+        <span class="qiraat-name">Warsh</span>
+        <span class="qiraat-sub">West Africa &middot; Mali</span>
+      </button>
+    </div>
+
+    <p class="qiraat-note">We check you against the reading you picked. Warsh is never marked wrong just for being different from Hafs.</p>
+    <p class="hint">Remembered for this session.</p>
+  </section>
+
+  <!-- ============ SCREEN 3 — DAILY TIME PICKER ============ -->
+  <section class="screen" id="screen-time" data-screen="time" aria-label="Daily time picker">
+    <button class="back-btn" type="button" data-goto="qiraat">&larr; Back</button>
+    <h1 class="screen-title">How much time today?</h1>
+    <p class="screen-sub">Pick a time. We fill it.</p>
+
+    <div class="time-grid">
+      <button class="time-btn" type="button" data-minutes="30">30 min</button>
+      <button class="time-btn" type="button" data-minutes="45">45 min</button>
+      <button class="time-btn" type="button" data-minutes="60">60 min</button>
+      <button class="time-btn" type="button" data-minutes="90">90 min</button>
+      <button class="time-btn" type="button" data-minutes="120">2 hrs</button>
+    </div>
+
+    <div class="split" aria-label="Time split">
+      <div class="split-row">
+        <span class="split-label">Sabaq &middot; New</span>
+        <span class="bar"><span class="bar-fill bar-sabaq" id="barSabaq"></span></span>
+        <span class="split-min" id="minSabaq">18 min</span>
+      </div>
+      <div class="split-row">
+        <span class="split-label">Sabqi &middot; Recent review</span>
+        <span class="bar"><span class="bar-fill bar-sabqi" id="barSabqi"></span></span>
+        <span class="split-min" id="minSabqi">15 min</span>
+      </div>
+      <div class="split-row">
+        <span class="split-label">Manzil &middot; Old review</span>
+        <span class="bar"><span class="bar-fill bar-manzil" id="barManzil"></span></span>
+        <span class="split-min" id="minManzil">12 min</span>
+      </div>
+    </div>
+
+    <button class="primary-btn" type="button" data-goto="loop">See today&rsquo;s plan &rarr;</button>
+  </section>
+
+  <!-- ============ SCREEN 4 — DAILY LOOP ============ -->
+  <section class="screen" id="screen-loop" data-screen="loop" aria-label="Today's plan">
+    <button class="back-btn" type="button" data-goto="time">&larr; Back</button>
+    <h1 class="screen-title">Today&rsquo;s plan</h1>
+    <p class="screen-sub" id="planSummary">Pick a mode, a reading, and a time.</p>
+
+    <div class="task-list">
+      <button class="task-card" type="button" data-task="sabaq">
+        <span class="task-kind">1 &middot; Sabaq</span>
+        <span class="task-title">New lesson &middot; An-Naba 21&ndash;26</span>
+        <span class="task-sub">6 new ayahs to learn</span>
+        <span class="task-min" id="taskMinSabaq">18 min</span>
+        <span class="task-done" id="taskDoneSabaq" hidden>Done &#10003;</span>
+      </button>
+
+      <button class="task-card" type="button" data-task="sabqi">
+        <span class="task-kind">2 &middot; Sabqi</span>
+        <span class="task-title">Recent review &middot; An-Naba 1&ndash;20</span>
+        <span class="task-sub">Fix 3 words from yesterday</span>
+        <span class="task-min" id="taskMinSabqi">15 min</span>
+        <span class="task-done" id="taskDoneSabqi" hidden>Done &#10003;</span>
+      </button>
+
+      <button class="task-card" type="button" data-task="manzil">
+        <span class="task-kind">3 &middot; Manzil</span>
+        <span class="task-title">Old review &middot; Al-Mulk 1&ndash;12</span>
+        <span class="task-sub">Keep old verses fresh</span>
+        <span class="task-min" id="taskMinManzil">12 min</span>
+        <span class="task-done" id="taskDoneManzil" hidden>Done &#10003;</span>
+      </button>
+    </div>
+
+    <!-- Practice check — LIVE listening (Web Speech API), ported from v2 as-is -->
+    <div class="practice" id="practicePanel" hidden>
+      <p class="practice-label">Live listening (beta)</p>
+      <p class="practice-task" id="practiceTask">Sabaq &middot; Al-Fatiha 1:1</p>
+      <p class="practice-surah">Verse <span id="practiceVerseNum">1 of 11</span> &middot; <span id="practiceQiraat">Hafs</span></p>
+      <p class="verse" id="practiceVerse" dir="rtl" lang="ar"></p>
+      <p class="verse-translation" id="practiceTranslit"></p>
+      <p class="practice-progress" id="practiceProgress">Verse 1 of 11 &middot; best &mdash;</p>
+
+      <button class="mic-btn" type="button" id="micBtn" aria-label="Tap and recite">
+        <span class="mic-icon" aria-hidden="true">&#127908;</span>
+        <span class="mic-text" id="micBtnText">Tap and recite</span>
+      </button>
+      <p class="practice-status" id="practiceStatus" aria-live="polite"></p>
+      <p class="heard-line interim" id="interimLine" hidden><strong>Listening&hellip;</strong> <span id="interimText"></span></p>
+      <p class="heard-line" id="heardLine" hidden><strong>What I heard:</strong> <span id="heardText"></span></p>
+
+      <div class="practice-result" id="practiceResult" hidden>
+        <div class="score-ring" id="scoreRing"><span class="score-num" id="practiceScore">&mdash;</span></div>
+        <p class="result-title" id="resultTitle">Good work!</p>
+        <p class="legend">
+          <span class="legend-item"><span class="dot dot-good"></span>Heard</span>
+          <span class="legend-item"><span class="dot dot-learn"></span>Missed</span>
+        </p>
+        <div class="fixes" id="practiceFeedback"></div>
+        <p class="memory-note" id="practiceMemoryNote"></p>
+        <div class="practice-actions">
+          <button class="ghost-btn" type="button" id="practiceAgain">Try again</button>
+          <button class="primary-btn" type="button" id="practiceNext">Next verse</button>
+        </div>
+      </div>
+
+      <p class="practice-note">It hears words, not perfect tajweed &mdash; the transcript below shows exactly what it heard. Live listening works in Chrome or Edge and needs internet.</p>
+      <button class="ghost-btn" type="button" id="practiceClose">Back to today&rsquo;s plan</button>
+    </div>
+
+    <h2 class="juz-title">Your 30-juz map</h2>
+    <div class="juz-grid" id="juzGrid" aria-label="30-juz progress map"></div>
+    <p class="juz-legend">
+      <span class="legend-item"><span class="dot dot-good"></span>Done</span>
+      <span class="legend-item"><span class="dot dot-progress"></span>In progress</span>
+      <span class="legend-item"><span class="dot dot-todo"></span>Not started</span>
+    </p>
+    <p class="hint">Juz 30 in progress &middot; the rest not started yet. Sample data.</p>
+  </section>
+
+  <!-- ============ SCREEN 5 — PARENT DASHBOARD (PREVIEW) ============ -->
+  <section class="screen" id="screen-family" data-screen="family" aria-label="Parent dashboard preview">
+    <button class="back-btn" type="button" data-goto="loop">&larr; Back</button>
+    <h1 class="screen-title">My family</h1>
+    <p class="sample-badge">Sample data &mdash; preview</p>
+    <p class="screen-sub">What your children did today. Read-only.</p>
+
+    <div class="child-card">
+      <div class="child-head">
+        <span class="child-name">Yusuf</span>
+        <span class="child-age">11</span>
+      </div>
+      <p class="child-line">Today done &middot; 45 min &middot; Score 86%</p>
+      <p class="child-line">Streak: 12 days</p>
+      <div class="bar"><span class="bar-fill bar-sabaq" style="width: 68%"></span></div>
+      <p class="child-note">Working on: Madd, ghunna.<br />Next: finish An-Naba in ~9 days.</p>
+      <p class="child-note">Weak verses: An-Naba 24&ndash;26</p>
+      <button class="ghost-btn child-btn" type="button" data-goto="loop">See today &rarr;</button>
+    </div>
+
+    <div class="child-card">
+      <div class="child-head">
+        <span class="child-name">Maryam</span>
+        <span class="child-age">8</span>
+      </div>
+      <p class="child-line">Beginner &middot; Letters + Al-Ikhlas</p>
+      <p class="child-line">Streak: 5 days</p>
+      <div class="bar"><span class="bar-fill bar-sabqi" style="width: 34%"></span></div>
+      <p class="child-note">Short, easy sessions while she learns to read.</p>
+      <p class="child-note">Weak verses: Al-Ikhlas 3&ndash;4</p>
+      <button class="ghost-btn child-btn" type="button" data-goto="loop">See her plan &rarr;</button>
+    </div>
+
+    <p class="weekly-note">This week: Yusuf practiced 5 days and learned 18 new ayahs. On track to finish Juz 30 by Ramadan.</p>
+  </section>
+
+  <!-- ============ SCREEN 6 — SURAH PICKER (v3) ============ -->
+  <section class="screen" id="screen-surahs" data-screen="surahs" aria-label="Choose a surah">
+    <button class="back-btn" type="button" data-goto="home">&larr; Back</button>
+    <h1 class="screen-title">Choose a surah</h1>
+    <p class="screen-sub">All 114 surahs. Search by name or number.</p>
+    <input class="search-input" id="surahSearch" type="search" placeholder="Search surahs… e.g. Yasin, 36, Al-Fatiha" aria-label="Search surahs" autocomplete="off" />
+    <div class="surah-list" id="surahList"></div>
+    <p class="no-results" id="surahNoResults" hidden>No surah matches that search.</p>
+  </section>
+
+  <!-- ============ SCREEN 7 — READ MODE (v3) ============ -->
+  <section class="screen" id="screen-read" data-screen="read" aria-label="Read mode">
+    <button class="back-btn" type="button" data-goto="surahs">&larr; All surahs</button>
+    <div class="read-header">
+      <p class="read-surah-ar" id="readSurahAr" dir="rtl" lang="ar"></p>
+      <p class="read-surah-en" id="readSurahEn"></p>
+      <p class="read-surah-meta" id="readSurahMeta"></p>
+    </div>
+    <p class="bismillah" id="readBismillah" dir="rtl" lang="ar" hidden>بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</p>
+    <div class="translation-note" id="translationNote" hidden>
+      English translation is not bundled in this version yet — the Arabic text and transliteration are shown below.
+      Translation is coming in a later week.
+    </div>
+    <div class="ayah-list" id="ayahList"></div>
+
+    <div class="read-toolbar" role="toolbar" aria-label="Reading controls">
+      <button class="toolbar-btn" type="button" id="toolbarPlay">▶ Play</button>
+      <button class="toolbar-btn" type="button" id="toolbarAudio">Audio</button>
+      <button class="toolbar-btn" type="button" id="toolbarTranslation">Translation</button>
+      <button class="toolbar-btn" type="button" id="toolbarMore">More</button>
+    </div>
+
+    <div class="read-settings" id="readSettings" hidden>
+      <p class="settings-title">Audio settings</p>
+      <div class="settings-row">
+        <label>Reciter</label>
+        <button class="ghost-btn" type="button" id="settingsReciterBtn" style="margin-top:0;min-height:48px;width:auto;padding:0 18px;">Choose</button>
+      </div>
+      <div class="settings-row">
+        <label for="speedSelect">Playback speed</label>
+        <select id="speedSelect">
+          <option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.25">1.25×</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label for="delaySelect">Pause between ayahs</label>
+        <select id="delaySelect">
+          <option value="0" selected>Continuous</option>
+          <option value="2">2 seconds</option>
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label>Repeat one ayah</label>
+        <button class="toolbar-btn" type="button" id="repeatOneBtn" style="flex:0 0 120px;background:var(--emerald);">Off</button>
+      </div>
+      <div class="settings-row">
+        <label>Repeat a range</label>
+        <span>
+          <input type="number" id="rangeStart" min="1" value="1" aria-label="Repeat from ayah" />
+          &ndash;
+          <input type="number" id="rangeEnd" min="1" value="5" aria-label="Repeat to ayah" />
+        </span>
+      </div>
+      <div class="settings-row">
+        <button class="ghost-btn" type="button" id="rangeApplyBtn" style="margin-top:0;min-height:48px;">Repeat this range</button>
+        <button class="ghost-btn" type="button" id="rangeClearBtn" style="margin-top:0;min-height:48px;">Clear repeat</button>
+      </div>
+      <div class="settings-row">
+        <label>Text size</label>
+        <span class="stepper">
+          <button class="stepper-btn" type="button" id="fontMinus" aria-label="Smaller text">&minus;</button>
+          <span class="stepper-val" id="fontSizeVal">30</span>
+          <button class="stepper-btn" type="button" id="fontPlus" aria-label="Bigger text">+</button>
+        </span>
+      </div>
+      <div class="settings-row">
+        <label>Transliteration</label>
+        <button class="toolbar-btn" type="button" id="translitBtn" style="flex:0 0 120px;background:var(--emerald);">On</button>
+      </div>
+      <div class="settings-row">
+        <label>Download this surah</label>
+        <span>
+          <button class="ghost-btn" type="button" id="downloadSurahBtn" style="margin-top:0;min-height:48px;">Download</button>
+          <span class="download-badge" id="downloadBadge" hidden>Downloaded ✓</span>
+        </span>
+      </div>
+      <p class="download-status" id="downloadStatus"></p>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 8 — RECITER PICKER (v3) ============ -->
+  <section class="screen" id="screen-reciters" data-screen="reciters" aria-label="Choose a reciter">
+    <button class="back-btn" type="button" data-goto="read">&larr; Back to reading</button>
+    <h1 class="screen-title">Choose your teacher</h1>
+    <p class="screen-sub">Pick a reciter. Your choice is used everywhere.</p>
+    <input class="search-input" id="reciterSearch" type="search" placeholder="Search reciters…" aria-label="Search reciters" autocomplete="off" />
+    <div class="reciter-list" id="reciterList"></div>
+    <p class="no-results" id="reciterNoResults" hidden>No Results</p>
+    <p class="credits-line">Audio: everyayah.com / VerseByVerseQuran.com / QuranicAudio.com</p>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <p>Sabaq &middot; $60/month &mdash; all access &middot; 3 months free at launch</p>
+  <p class="footer-note">Live listening (beta) works in Chrome or Edge and needs internet. It hears words, not perfect tajweed.</p>
+</footer>
+
+<!-- Playback bar (shown while audio is playing) -->
+<div class="playback-bar" id="playbackBar" hidden>
+  <div class="playback-inner">
+    <div class="playback-reciter">
+      <span id="playbackReciterName">—</span>
+      <span class="playback-times" id="playbackTimes">0:00 / 0:00</span>
+    </div>
+    <input class="playback-scrub" id="playbackScrub" type="range" min="0" max="100" value="0" step="1" aria-label="Playback progress" />
+    <div class="playback-controls">
+      <button class="playback-btn" type="button" id="playbackPlayPause">⏸ Pause</button>
+      <button class="playback-btn small" type="button" id="playbackSpeed">1x</button>
+      <button class="playback-btn small" type="button" id="playbackRepeat" aria-label="Repeat">↻</button>
+      <button class="playback-btn close" type="button" id="playbackClose" aria-label="Stop and close">✕</button>
+    </div>
+  </div>
+</div>
+
+<nav class="bottom-nav" aria-label="Main navigation">
+  <button class="nav-btn is-active" type="button" data-goto="home">
+    <span class="nav-icon" aria-hidden="true">&#8962;</span>
+    <span class="nav-label">Home</span>
+  </button>
+  <button class="nav-btn" type="button" data-goto="surahs">
+    <span class="nav-icon" aria-hidden="true">&#9776;</span>
+    <span class="nav-label">Reading</span>
+  </button>
+  <button class="nav-btn" type="button" data-goto="time">
+    <span class="nav-icon" aria-hidden="true">&#9719;</span>
+    <span class="nav-label">Time</span>
+  </button>
+  <button class="nav-btn" type="button" data-goto="loop">
+    <span class="nav-icon" aria-hidden="true">&#10003;</span>
+    <span class="nav-label">Today</span>
+  </button>
+  <button class="nav-btn" type="button" data-goto="family">
+    <span class="nav-icon" aria-hidden="true">&#9829;</span>
+    <span class="nav-label">Family</span>
+  </button>
+</nav>
+
+<audio id="audioEl" preload="auto"></audio>
+<script src="app.js"></script>
+</body>
+</html>
