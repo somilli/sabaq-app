@@ -1,22 +1,77 @@
 
 /* Sabaq v1 — plain CSS, no build step. Design tokens from the build brief. */
 
+/* v4b — fonts are bundled locally (fonts/*.woff2). The v4 build fetched
+   them from Google Fonts and Kufi silently fell back to Uthmani; local
+   files make every font deterministic. The four Noto Kufi weight files
+   are byte-identical (one static file), so a single 400 @font-face
+   covers the family. */
+@font-face {
+  font-family: "Amiri Quran";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/amiri-quran-arabic-400.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+
+@font-face {
+  font-family: "Alkalami";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/alkalami-arabic-400.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+
+@font-face {
+  font-family: "Noto Kufi Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/noto-kufi-arabic-arabic-400.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/outfit-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("fonts/newsreader-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* v4b — ink + paper + gold. The v4 emerald + beige template look is
+   gone: warm-white paper, near-black ink, gold ONLY for Quranic Arabic
+   and accepted (correct) words. No green anywhere — --success is now
+   deep gold, not green. */
 :root {
-  --emerald: #0B3D2E;
-  --emerald-2: #12513D;
+  --ink: #1B1B18;
+  --ink-soft: #33332E;
+  --paper: #FDFCF8;
   --gold: #C5A059;
-  --gold-dark: #9A7D3A;
-  --cream: #F6F3ED;
-  --ink: #13211B;
-  --muted: #5A6B62;
+  --gold-dark: #8A6D1F;
+  --muted: #6E6D64;
   --card: #FFFFFF;
-  --line: #E7DFD2;
-  --success: #177245;
+  --line: #E9E7DF;
+  --success: #8A6D1F;
   --amber: #B7791F;
   --red: #C0392B;
   --font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-head: "Newsreader", Georgia, "Times New Roman", serif;
   --font-arabic: "Amiri Quran", "Traditional Arabic", "Scheherazade", serif;
+  --font-alkalami: "Alkalami", "Amiri Quran", "Traditional Arabic", serif;
+  --font-kufi: "Noto Kufi Arabic", "Amiri Quran", "Traditional Arabic", serif;
   --radius: 20px;
 }
 
@@ -28,7 +83,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--cream);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 17px;
@@ -48,6 +103,7 @@ button:focus-visible {
 
 /* ---------- Top bar ---------- */
 
+/* v4b: paper header, ink text, hairline rule — no dark band. */
 .topbar {
   position: sticky;
   top: 0;
@@ -57,8 +113,9 @@ button:focus-visible {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--emerald);
-  color: #fff;
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand {
@@ -90,7 +147,7 @@ button:focus-visible {
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--gold-dark);
 }
 
 .qiraat-pill {
@@ -100,9 +157,9 @@ button:focus-visible {
   align-items: center;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
@@ -110,10 +167,12 @@ button:focus-visible {
 
 /* ---------- App frame ---------- */
 
+/* v4b: bottom clearance so the fixed nav never covers content — the
+   v4 script picker and mic button were half-hidden under it. */
 .app {
   max-width: 720px;
   margin: 0 auto;
-  padding: 20px 16px 32px;
+  padding: 20px 16px calc(140px + env(safe-area-inset-bottom, 0px));
 }
 
 .screen { display: none; }
@@ -152,7 +211,7 @@ button:focus-visible {
   padding: 0 22px;
   border: none;
   border-radius: 999px;
-  background: var(--emerald);
+  background: var(--ink);
   color: #fff;
   font-size: 18px;
   font-weight: 700;
@@ -169,10 +228,10 @@ button:focus-visible {
   min-height: 56px;
   margin-top: 14px;
   padding: 0 22px;
-  border: 2px solid var(--emerald);
+  border: 2px solid var(--ink);
   border-radius: 999px;
   background: transparent;
-  color: var(--emerald);
+  color: var(--ink);
   font-size: 17px;
   font-weight: 700;
 }
@@ -184,7 +243,7 @@ button:focus-visible {
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--emerald);
+  color: var(--ink);
   font-size: 17px;
   font-weight: 700;
 }
@@ -213,14 +272,14 @@ button:focus-visible {
 
 .mode-card.is-selected {
   border-color: var(--gold);
-  background: #FBF6EC;
+  background: #F4F2EC;
 }
 
 .mode-icon {
   display: block;
   width: 40px;
   height: 40px;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .mode-icon svg { width: 40px; height: 40px; }
@@ -261,7 +320,7 @@ button:focus-visible {
 
 .qiraat-card.is-selected {
   border-color: var(--gold);
-  background: #FBF6EC;
+  background: #F4F2EC;
 }
 
 .qiraat-name {
@@ -280,7 +339,7 @@ button:focus-visible {
   margin: 20px 0 0;
   padding: 16px 18px;
   border-radius: 16px;
-  background: #EFE9DC;
+  background: #F1EFE8;
   color: var(--ink);
   font-size: 16px;
   line-height: 1.5;
@@ -309,7 +368,7 @@ button:focus-visible {
 
 .time-btn.is-selected {
   border-color: var(--gold);
-  background: var(--emerald);
+  background: var(--ink);
   color: #fff;
 }
 
@@ -342,7 +401,7 @@ button:focus-visible {
   border-radius: 999px;
 }
 
-.bar-sabaq { background: var(--emerald); }
+.bar-sabaq { background: var(--ink); }
 .bar-sabqi { background: var(--gold); }
 .bar-manzil { background: var(--gold-dark); }
 
@@ -376,7 +435,7 @@ button:focus-visible {
 
 .task-card.is-done {
   border-color: var(--success);
-  background: #EDF5EF;
+  background: #F4F1E6;
 }
 
 .task-kind {
@@ -403,7 +462,7 @@ button:focus-visible {
   margin-top: 6px;
   font-size: 16px;
   font-weight: 700;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .task-done {
@@ -420,7 +479,7 @@ button:focus-visible {
   padding: 22px 18px;
   border: 2px solid var(--gold);
   border-radius: var(--radius);
-  background: #FFFDF7;
+  background: #FDFCF8;
 }
 
 .practice-label {
@@ -469,6 +528,13 @@ button:focus-visible {
   text-align: center;
 }
 
+.ear-line {
+  margin: 8px 0 0;
+  color: var(--gold);
+  font-size: 13px;
+  text-align: center;
+}
+
 .practice-result { margin-top: 18px; }
 
 .score-ring {
@@ -486,13 +552,13 @@ button:focus-visible {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  background: #FFFDF7;
+  background: #FDFCF8;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 26px;
   font-weight: 800;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .result-title {
@@ -531,7 +597,7 @@ button:focus-visible {
 .dot-practice { background: var(--amber); }
 .dot-learn { background: var(--red); }
 .dot-progress { background: var(--gold); }
-.dot-todo { background: var(--line); border: 1px solid #D8CFC0; }
+.dot-todo { background: var(--line); border: 1px solid #DDDAD0; }
 
 .fixes { margin: 0 0 10px; }
 
@@ -675,7 +741,7 @@ button:focus-visible {
   margin: 20px 0 0;
   padding: 16px 18px;
   border-radius: 16px;
-  background: #EFE9DC;
+  background: #F1EFE8;
   font-size: 16px;
   line-height: 1.5;
 }
@@ -722,7 +788,7 @@ button:focus-visible {
   color: var(--muted);
 }
 
-.nav-btn.is-active { color: var(--emerald); }
+.nav-btn.is-active { color: var(--ink); }
 
 .nav-icon {
   font-size: 22px;
@@ -748,6 +814,8 @@ button:focus-visible {
 
 /* ---------- v2: live listening ---------- */
 
+/* v4b: the mic is ink — gold is reserved for Quranic Arabic and
+   accepted words. */
 .mic-btn {
   display: flex;
   flex-direction: column;
@@ -759,7 +827,7 @@ button:focus-visible {
   margin: 18px auto 0;
   border: none;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--ink);
   color: #fff;
 }
 
@@ -787,7 +855,7 @@ button:focus-visible {
   margin: 0 0 6px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--emerald);
+  color: var(--ink);
   text-align: center;
 }
 
@@ -889,7 +957,7 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--emerald);
+  background: var(--ink);
   color: #fff;
   font-size: 16px;
   font-weight: 800;
@@ -913,7 +981,7 @@ button:focus-visible {
   flex: none;
   font-family: var(--font-arabic);
   font-size: 24px;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .surah-count {
@@ -935,7 +1003,7 @@ button:focus-visible {
   font-family: var(--font-arabic);
   font-size: 32px;
   line-height: 1.4;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .read-surah-en {
@@ -956,7 +1024,7 @@ button:focus-visible {
   font-size: calc(var(--read-font-size, 30px) * 0.9);
   line-height: 1.8;
   text-align: center;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .ayah-list { display: grid; gap: 4px; }
@@ -974,7 +1042,7 @@ button:focus-visible {
 }
 
 .ayah-row.is-playing {
-  background: #F7E8C3;
+  background: #F3EFE6;
   outline: 2px solid var(--gold);
 }
 
@@ -1031,7 +1099,7 @@ button:focus-visible {
   padding: 0 16px;
   border: none;
   border-radius: 999px;
-  background: var(--emerald);
+  background: var(--ink);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -1041,7 +1109,7 @@ button:focus-visible {
   margin: 12px 0;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #EFE9DC;
+  background: #F1EFE8;
   font-size: 16px;
   line-height: 1.5;
 }
@@ -1057,7 +1125,7 @@ button:focus-visible {
   margin-top: 20px;
   padding: 10px;
   border-radius: 18px;
-  background: var(--emerald);
+  background: var(--ink);
   box-shadow: 0 4px 18px rgba(11, 61, 46, 0.35);
 }
 
@@ -1074,7 +1142,7 @@ button:focus-visible {
 
 .toolbar-btn.is-on {
   background: var(--gold);
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .read-settings {
@@ -1124,10 +1192,10 @@ button:focus-visible {
 .stepper-btn {
   width: 48px;
   height: 48px;
-  border: 2px solid var(--emerald);
+  border: 2px solid var(--ink);
   border-radius: 50%;
   background: transparent;
-  color: var(--emerald);
+  color: var(--ink);
   font-size: 22px;
   font-weight: 800;
 }
@@ -1171,7 +1239,7 @@ button:focus-visible {
 
 .reciter-row.is-selected {
   border-color: var(--gold);
-  background: #FBF6EC;
+  background: #F4F2EC;
 }
 
 .reciter-avatar {
@@ -1182,7 +1250,7 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--emerald);
+  background: var(--ink);
   color: var(--gold);
   font-family: var(--font-head);
   font-size: 20px;
@@ -1201,7 +1269,7 @@ button:focus-visible {
 .reciter-ar {
   font-family: var(--font-arabic);
   font-size: 17px;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .reciter-meta {
@@ -1273,7 +1341,7 @@ button:focus-visible {
   gap: 10px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .playback-times { color: var(--muted); font-weight: 600; white-space: nowrap; }
@@ -1295,7 +1363,7 @@ button:focus-visible {
   min-height: 48px;
   border: none;
   border-radius: 999px;
-  background: var(--emerald);
+  background: var(--ink);
   color: #fff;
   font-size: 16px;
   font-weight: 700;
@@ -1304,8 +1372,8 @@ button:focus-visible {
 .playback-btn.small {
   flex: 0 0 64px;
   background: transparent;
-  border: 2px solid var(--emerald);
-  color: var(--emerald);
+  border: 2px solid var(--ink);
+  color: var(--ink);
 }
 
 .playback-btn.close {
@@ -1318,6 +1386,837 @@ button:focus-visible {
 
 .playback-btn.is-on {
   background: var(--gold);
-  color: var(--emerald);
+  color: var(--ink);
   border-color: var(--gold);
+}
+
+/* ---------- Layout-fix round (Nov 2): account, diagnostic, learning choice ---------- */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* (v4b: the header sign-in button is gone — guest only. The rule for
+   it is removed with the button.) */
+
+/* Diagnostic entry on Home */
+
+.diag-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 128px;
+  margin-bottom: 14px;
+  padding: 20px;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: #F4F2EC;
+  color: var(--ink);
+  text-align: left;
+}
+
+.diag-kicker {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+.diag-title {
+  font-family: var(--font-head);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.diag-sub {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.account-line {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+/* Learning choice on the daily plan */
+
+.learning-line {
+  margin: 0 0 16px;
+  font-size: 17px;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.learn-surah-btn { margin: 14px 0 4px; }
+
+/* Juz map tiles are now tappable buttons */
+
+.juz-tile { padding: 0 4px; }
+
+.juz-tile:active { border-color: var(--gold); }
+
+.juz-tile.is-selected {
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+/* Diagnostic result card */
+
+.diag-result {
+  margin-top: 22px;
+  padding: 22px 18px;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: #FDFCF8;
+}
+
+.diag-level {
+  margin: 0 0 8px;
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.diag-start {
+  margin: 0 0 6px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+/* Account sheet (bottom sheet, no backend) */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(11, 61, 46, 0.55);
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 12px 84px;
+  padding: 26px 20px 20px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(11, 61, 46, 0.35);
+}
+
+.sheet-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sheet-title {
+  margin: 0 0 8px;
+  font-family: var(--font-head);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.sheet-text {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.sheet-note {
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #F4F1E8;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.sheet-actions { display: grid; gap: 0; }
+
+.sheet-actions .primary-btn,
+.sheet-actions .ghost-btn { margin-top: 10px; }
+
+/* ---------- v3: live feedback mode ---------- */
+
+.live-honest {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #F1EFE8;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.live-range {
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.live-surah {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.live-range-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.live-range-fields input {
+  width: 64px;
+  min-height: 48px;
+  padding: 0 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.live-apply { margin-top: 12px; }
+
+.live-ayah {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+.live-verse {
+  margin: 0 0 10px;
+  font-family: var(--font-arabic);
+  font-size: 36px;
+  line-height: 2;
+  text-align: center;
+}
+
+.lf-word {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lf-word.is-current { background: #F1EFE8; }
+
+.lf-word.is-good { color: var(--gold); font-weight: 700; }
+
+.lf-word.is-bad { color: var(--red); font-weight: 700; }
+
+.lf-word.is-fixed {
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: underline wavy var(--red);
+  text-underline-offset: 8px;
+}
+
+.live-score {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+.live-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.live-toggle-label {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.live-toggle {
+  flex: 0 0 96px;
+  min-height: 48px;
+  background: var(--ink);
+}
+
+.live-toggle.is-on { background: var(--gold-dark); }
+
+.live-hold-note {
+  margin: 10px 0 0;
+  color: var(--red);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.live-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.live-nav .primary-btn,
+.live-nav .ghost-btn { margin-top: 0; }
+
+.live-summary {
+  margin-top: 18px;
+  padding: 18px;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: #FDFCF8;
+  text-align: center;
+}
+
+.live-summary-title {
+  margin: 0 0 6px;
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.live-summary-line {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.live-history-note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 16px;
+  text-align: center;
+}
+
+.live-history { display: grid; gap: 10px; }
+
+.live-mistake {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  text-align: left;
+}
+
+.live-mistake.is-fixed { border-color: var(--success); }
+
+.live-mistake.is-dismissed { opacity: 0.6; }
+
+.live-mistake-ref {
+  flex: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.live-mistake-words { flex: 1; line-height: 1.4; }
+
+.live-mistake-words em { font-style: normal; color: var(--red); }
+
+.live-mistake-status {
+  flex: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.live-mistake-status.open { color: var(--red); }
+
+.live-mistake-status.fixed { color: var(--success); }
+
+.live-mistake-x {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (min-width: 560px) {
+  .live-verse { font-size: 42px; }
+}
+
+/* ================= v4b: intro / plan / lesson / captions =================
+   Ink + paper + gold. The caption behaviour comes from the video; the
+   UI is Sabaq's own — warm-white paper, near-black ink, gold only for
+   Quranic Arabic and accepted words. */
+
+/* ---------- Intro: the Basmala ---------- */
+
+#screen-intro { text-align: center; padding-top: 6vh; }
+
+.intro-basmala {
+  margin: 0 0 2px;
+  font-family: var(--font-alkalami);
+  font-size: clamp(30px, 7.2vw, 46px);
+  line-height: 2.1;
+  color: var(--ink);
+}
+
+/* Entrance words (v4b): the Basmala animates as its four WORDS, not
+   per letter — splitting Arabic into letter spans breaks the joining
+   and the phrase reads scattered. Each word starts off its place,
+   then glides in. Colors cycle ink / gold / deep gold. */
+.intro-basmala .lt {
+  display: inline-block;
+  opacity: 0;
+  transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg));
+  transition: transform var(--dur, .85s) cubic-bezier(.22, .68, .24, 1) var(--delay, 0s),
+              opacity .45s ease var(--delay, 0s);
+  will-change: transform, opacity;
+}
+
+.intro-basmala.go .lt { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+
+.intro-basmala .lt.c0 { color: var(--ink); }
+
+.intro-basmala .lt.c1 { color: var(--gold); }
+
+.intro-basmala .lt.c2 { color: var(--gold-dark); }
+
+.intro-basmala-en {
+  margin: 0 0 20px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.intro-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 56px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.intro-tag {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.intro-guest { margin-top: 22px; }
+
+/* ---------- Plan picker ---------- */
+
+.plan-grid { display: grid; gap: 12px; margin-top: 16px; }
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 112px;
+  padding: 18px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: left;
+  color: var(--ink);
+}
+
+.plan-card:active { border-color: var(--gold); }
+
+.plan-icon { font-size: 30px; line-height: 1; }
+
+.plan-name { font-size: 19px; font-weight: 800; }
+
+.plan-sub { font-size: 15px; color: var(--muted); }
+
+/* ---------- Lesson: level + three tiers ---------- */
+
+.lesson-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.lesson-level-label { font-weight: 800; }
+
+.level-btn {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.level-btn.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.lesson-level-note { margin: 0 0 12px; font-size: 15px; color: var(--muted); }
+
+.tier-list { display: grid; gap: 12px; margin: 12px 0; }
+
+.tier-card {
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.tier-kicker {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+.tier-title { margin: 0 0 2px; font-size: 20px; font-weight: 800; }
+
+.tier-sub { margin: 0 0 12px; color: var(--muted); }
+
+.tier-start { width: 100%; }
+
+.lesson-picker {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid var(--line);
+}
+
+.lesson-picker-title { margin: 0 0 10px; font-size: 18px; font-weight: 800; }
+
+.lesson-field { margin-bottom: 10px; }
+
+.lesson-field label { display: block; margin-bottom: 4px; font-weight: 700; }
+
+.lesson-field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font: inherit;
+  color: var(--ink);
+}
+
+.lesson-range-fields input {
+  width: 84px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font: inherit;
+  color: var(--ink);
+  text-align: center;
+}
+
+.lesson-note { color: var(--muted); }
+
+/* ---------- Caption modes / fonts / teacher ---------- */
+
+.cap-modes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cap-mode {
+  min-height: 48px;
+  padding: 8px 4px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cap-mode.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.cap-mode-note { margin: 8px 0 0; font-size: 15px; color: var(--muted); text-align: center; }
+
+/* v4b: the font picker is a 3-column grid — in v4 the three buttons
+   overflowed the screen width and Kufic was cut off at the edge. */
+.cap-fonts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cap-fonts-label { font-weight: 800; grid-column: 1 / -1; }
+
+.cap-font {
+  min-height: 48px;
+  padding: 8px 4px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cap-font.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.cap-teacher { width: 100%; margin-top: 12px; }
+
+.cap-teacher-note { margin: 8px 0 0; font-size: 15px; color: var(--muted); text-align: center; }
+
+/* ---------- Caption line: flowing RTL, like the video ----------
+   v4 stacked each word as a giant card (one word per row) because the
+   full pill row was wider than the word. v4b: the line is one flowing
+   right-to-left line of compact inline word columns — one small gold
+   POS pill, the Arabic word, its gloss. The full morphology (every
+   sub-pill) lives in the detail strip below the line, for the word
+   you are on — that is how the video does it, and it is what keeps
+   the line flowing. Sub-pills stay in the DOM inside each word (the
+   tests and the detail strip read them from there); they are hidden
+   in the line itself.
+   OVERLAP FIX (v4 bug): the Arabic span is a block with line-height
+   2.1, so Amiri's tall diacritics and descenders stay inside their
+   own line box and can never paint over the gloss underneath. */
+.live-verse.cap-line {
+  display: block;
+  margin: 10px 0 2px;
+  font-size: 30px;
+  line-height: 1.4;
+  text-align: right;
+  direction: rtl;
+}
+
+.cap-word {
+  display: inline-block;
+  vertical-align: top;
+  text-align: center;
+  padding: 4px 5px 6px;
+  margin: 0 1px;
+  border-radius: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cap-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  min-height: 18px;
+  margin-bottom: 1px;
+}
+
+/* In the line only the POS pill shows; the rest of the grammar is in
+   the detail strip. */
+.cap-word .cap-pill.sub { display: none; }
+
+.cap-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  /* v4b fix: pills are Latin text inside an RTL line. Without this,
+     a trailing abbreviation dot jumps to the front (".masc"). */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.cap-pill.pos { background: var(--gold); color: var(--ink); }
+
+.cap-pill.sub { background: #EDEBE3; color: var(--ink); }
+
+.cap-ar {
+  display: block;
+  font-family: var(--font-arabic);
+  font-size: 30px;
+  line-height: 2.1;
+  padding-bottom: 2px;
+}
+
+/* Quran font picker: Uthmani (Amiri Quran) / West African (Alkalami) /
+   Kufic (Noto Kufi Arabic) — applies to the caption words. */
+#screen-live[data-capfont="alkalami"] .cap-ar { font-family: var(--font-alkalami); }
+
+#screen-live[data-capfont="kufi"] .cap-ar { font-family: var(--font-kufi); }
+
+.cap-gloss {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--muted);
+  direction: ltr;
+}
+
+/* ---------- Current-word detail strip ----------
+   The word you are on, big, with its FULL grammar (POS + every
+   sub-pill) and gloss — the video's caption, under the line. Fixed
+   height so the line never jumps as you recite. */
+.cap-detail {
+  min-height: 138px;
+  margin: 8px 0 6px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+
+.cap-detail-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  min-height: 22px;
+  margin-bottom: 2px;
+}
+
+.cap-detail-ar {
+  font-family: var(--font-arabic);
+  font-size: 34px;
+  line-height: 1.9;
+  color: var(--ink);
+}
+
+#screen-live[data-capfont="alkalami"] .cap-detail-ar { font-family: var(--font-alkalami); }
+
+#screen-live[data-capfont="kufi"] .cap-detail-ar { font-family: var(--font-kufi); }
+
+.cap-detail-ar.is-good { color: var(--gold-dark); }
+
+.cap-detail-ar.is-bad { color: var(--red); }
+
+.cap-detail-gloss {
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--muted);
+  direction: ltr;
+}
+
+.cap-detail-state {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Word states: pending ink (Beginner) / invisible placeholder
+   (Medium, Diagnostic) / not rendered at all (Harder).
+   Accepted words are deep gold — readable on paper, and gold is
+   reserved for Quranic Arabic + accepted words. Colour alone marks
+   the state; no fake-bold on Quranic text. */
+.cap-word.is-current { background: #F1EFE8; }
+
+.cap-word.is-good .cap-ar { color: var(--gold-dark); }
+
+.cap-word.is-bad .cap-ar { color: var(--red); }
+
+.cap-word.is-bad .cap-gloss { color: var(--red); }
+
+.cap-word.is-fixed .cap-ar {
+  color: var(--gold-dark);
+  text-decoration: underline wavy var(--red);
+  text-underline-offset: 8px;
+}
+
+.cap-word.is-dismissed .cap-ar { color: var(--muted); }
+
+.cap-word.is-unheard { visibility: hidden; }
+
+.cap-word.is-hidden { display: none; }
+
+/* ---------- Diagnostic report ---------- */
+
+.diag-report {
+  margin-top: 12px;
+  padding: 14px;
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  background: #F1EFE8;
+}
+
+.diag-report-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
+
+.diag-report-line { margin: 4px 0 0; }
+
+@media (min-width: 560px) {
+  .plan-grid { grid-template-columns: 1fr 1fr; }
+  .cap-ar { font-size: 34px; }
+  .cap-detail-ar { font-size: 38px; }
 }

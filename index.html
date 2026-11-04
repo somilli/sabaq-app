@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Sabaq v3 — Quran Memorization Coach</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'%3E%3Crect width='44' height='44' rx='10' fill='%230B3D2E'/%3E%3Cg fill='%23C5A059'%3E%3Crect x='8' y='18' width='3' height='8' rx='1.5'/%3E%3Crect x='13' y='13' width='3' height='18' rx='1.5'/%3E%3Crect x='18' y='9' width='3' height='26' rx='1.5'/%3E%3Crect x='23' y='14' width='3' height='16' rx='1.5'/%3E%3Crect x='28' y='10' width='3' height='24' rx='1.5'/%3E%3Crect x='33' y='17' width='3' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E" />
-<meta name="description" content="Sabaq — the first multi interactive AI Quranic platform. Read, listen to your teacher, and memorize. Web version 3." />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,600;6..72,700&family=Amiri+Quran&display=swap" rel="stylesheet" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Sabaq v4 — Quran Memorization Coach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'%3E%3Crect width='44' height='44' rx='10' fill='%231B1B18'/%3E%3Cg fill='%23C5A059'%3E%3Crect x='8' y='18' width='3' height='8' rx='1.5'/%3E%3Crect x='13' y='13' width='3' height='18' rx='1.5'/%3E%3Crect x='18' y='9' width='3' height='26' rx='1.5'/%3E%3Crect x='23' y='14' width='3' height='16' rx='1.5'/%3E%3Crect x='28' y='10' width='3' height='24' rx='1.5'/%3E%3Crect x='33' y='17' width='3' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E" />
+<meta name="description" content="Sabaq — the first multi interactive AI Quranic platform. Recite word by word, with grammar and meaning. Web version 4." />
+<!-- v4b: fonts are bundled locally (fonts/*.woff2) — no Google Fonts request. -->
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -17,7 +15,7 @@
   <div class="brand">
     <span class="brand-mark" aria-hidden="true">
       <svg class="logo-svg" viewBox="0 0 44 44" role="img" aria-label="Sabaq logo">
-        <rect width="44" height="44" rx="10" fill="#12513D" />
+        <rect width="44" height="44" rx="10" fill="#1B1B18" />
         <g fill="#C5A059">
           <rect x="8" y="18" width="3" height="8" rx="1.5" />
           <rect x="13" y="13" width="3" height="18" rx="1.5" />
@@ -33,7 +31,9 @@
       <span class="brand-tag">Quran Platform</span>
     </span>
   </div>
-  <span class="qiraat-pill" id="qiraatPill">Reading: —</span>
+  <div class="topbar-right">
+    <span class="qiraat-pill" id="qiraatPill">Reading: —</span>
+  </div>
 </header>
 
 <main class="app" id="app">
@@ -46,10 +46,116 @@
     <code>http://localhost:8000</code> in your browser.
   </div>
 
+  <!-- ============ SCREEN 0 — INTRO (v4) ============ -->
+  <section class="screen" id="screen-intro" data-screen="intro" aria-label="Welcome">
+    <p class="intro-basmala" id="introBasmala" dir="rtl" lang="ar">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
+    <p class="intro-basmala-en">In the name of Allah, the All-Merciful, the All-Gracious</p>
+    <h1 class="intro-title">Sabaq</h1>
+    <p class="intro-tag">Understand the Qur&rsquo;an, word by word.</p>
+    <p class="screen-sub">Recite, and every word lights up as the ear hears it — with what it means and how it works.</p>
+    <button class="primary-btn intro-guest" type="button" id="introGuestBtn">Continue as guest</button>
+    <p class="hint">Guest only for now &mdash; your progress stays on this device.</p>
+  </section>
+
+  <!-- ============ SCREEN 0b — CHOOSE YOUR PLAN (v4) ============ -->
+  <section class="screen" id="screen-plan" data-screen="plan" aria-label="Choose your plan">
+    <button class="back-btn" type="button" data-goto="intro">&larr; Back</button>
+    <h1 class="screen-title">Choose your plan</h1>
+    <p class="screen-sub">What do you want to learn? Pick one — you can change it later.</p>
+    <div class="plan-grid">
+      <button class="plan-card" type="button" data-plan="surah">
+        <span class="plan-icon" aria-hidden="true">&#128214;</span>
+        <span class="plan-name">Learn a specific surah</span>
+        <span class="plan-sub">Pick any surah, learn it ayah by ayah</span>
+      </button>
+      <button class="plan-card" type="button" data-plan="juz">
+        <span class="plan-icon" aria-hidden="true">&#128395;</span>
+        <span class="plan-name">Learn your juz</span>
+        <span class="plan-sub">Work through one juz at a time</span>
+      </button>
+      <button class="plan-card" type="button" data-plan="ayah">
+        <span class="plan-icon" aria-hidden="true">&#10022;</span>
+        <span class="plan-name">Learn a specific ayah</span>
+        <span class="plan-sub">One ayah, until you own it</span>
+      </button>
+      <button class="plan-card" type="button" data-plan="review">
+        <span class="plan-icon" aria-hidden="true">&#8635;</span>
+        <span class="plan-name">Review my memorization</span>
+        <span class="plan-sub">Go back over the words you missed</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 0c — TODAY'S LESSON (v4) ============ -->
+  <section class="screen" id="screen-lesson" data-screen="lesson" aria-label="Today's lesson">
+    <button class="back-btn" type="button" data-goto="plan">&larr; Back</button>
+    <h1 class="screen-title">Today&rsquo;s lesson</h1>
+    <p class="screen-sub" id="lessonPlanLine">Your plan</p>
+
+    <div class="lesson-level" role="group" aria-label="Lesson length">
+      <span class="lesson-level-label">Lesson length</span>
+      <button class="level-btn is-on" type="button" data-level="beginner">Beginner · 5 ayahs</button>
+      <button class="level-btn" type="button" data-level="standard">Standard · 1 page</button>
+      <button class="level-btn" type="button" data-level="advanced">Advanced · 2 pages</button>
+    </div>
+    <p class="lesson-level-note" id="lessonLevelNote">Beginner: 5 new ayahs a day.</p>
+
+    <div class="tier-list">
+      <div class="tier-card" id="tierSabaq">
+        <p class="tier-kicker">Sabaq &middot; today&rsquo;s new lesson</p>
+        <p class="tier-title" id="tierSabaqTitle">Al-Fatiha 1:1&ndash;1:5</p>
+        <p class="tier-sub" id="tierSabaqSub">5 ayahs</p>
+        <button class="primary-btn tier-start" type="button" id="tierSabaqStart">Start Sabaq &rarr;</button>
+      </div>
+      <div class="tier-card" id="tierSabqi">
+        <p class="tier-kicker">Sabqi &middot; recent revision</p>
+        <p class="tier-title" id="tierSabqiTitle">No recent lesson yet</p>
+        <p class="tier-sub" id="tierSabqiSub">Finish your first lesson — your revision will show here.</p>
+        <button class="primary-btn tier-start" type="button" id="tierSabqiStart" disabled>Start Sabqi &rarr;</button>
+      </div>
+      <div class="tier-card" id="tierManzil">
+        <p class="tier-kicker">Manzil &middot; older revision</p>
+        <p class="tier-title" id="tierManzilTitle">No older revision yet</p>
+        <p class="tier-sub" id="tierManzilSub">Once you finish lessons in another juz, it will rotate here.</p>
+        <button class="primary-btn tier-start" type="button" id="tierManzilStart" disabled>Start Manzil &rarr;</button>
+      </div>
+    </div>
+
+    <div class="lesson-picker" id="lessonPicker">
+      <p class="lesson-picker-title">Where does Sabaq start?</p>
+      <div class="lesson-field" id="lessonSurahField">
+        <label for="lessonSurahSelect">Surah</label>
+        <select id="lessonSurahSelect" aria-label="Choose a surah"></select>
+      </div>
+      <div class="lesson-field" id="lessonJuzField" hidden>
+        <label for="lessonJuzSelect">Juz</label>
+        <select id="lessonJuzSelect" aria-label="Choose a juz"></select>
+      </div>
+      <div class="lesson-field lesson-range">
+        <label>Ayahs</label>
+        <span class="lesson-range-fields">
+          <input type="number" id="lessonFrom" min="1" value="1" aria-label="From ayah" />
+          &ndash;
+          <input type="number" id="lessonTo" min="1" value="5" aria-label="To ayah" />
+        </span>
+      </div>
+      <p class="lesson-note" id="lessonNote" hidden></p>
+    </div>
+    <button class="ghost-btn" type="button" id="lessonResumeBtn" hidden>Resume where I left off</button>
+    <button class="ghost-btn" type="button" id="lessonDiagnosticBtn">Run a diagnostic on this surah</button>
+  </section>
+
   <!-- ============ SCREEN 1 — HOME / MODE PICKER ============ -->
   <section class="screen is-active" id="screen-home" data-screen="home" aria-label="Home — who is learning">
     <h1 class="screen-title">Who is learning today?</h1>
     <p class="screen-sub">Tap one. No typing, no forms.</p>
+
+    <button class="diag-card" type="button" id="diagStart">
+      <span class="diag-kicker">Free &middot; 3 quick verses</span>
+      <span class="diag-title">Where are you?</span>
+      <span class="diag-sub">Find your level — recite 3 short verses and we will point you to the right starting surah.</span>
+    </button>
+    <p class="account-line" id="accountLine" hidden>You&rsquo;re learning as a guest — your progress stays on this device.</p>
 
     <div class="mode-grid">
       <button class="mode-card" type="button" data-mode="beginner">
@@ -151,46 +257,50 @@
     <button class="back-btn" type="button" data-goto="time">&larr; Back</button>
     <h1 class="screen-title">Today&rsquo;s plan</h1>
     <p class="screen-sub" id="planSummary">Pick a mode, a reading, and a time.</p>
+    <p class="learning-line" id="learningLine">Learning: <strong id="learningSurahName">An-Naba</strong> &middot; <button class="link-btn" id="changeLearningBtn" type="button">Change</button></p>
 
     <div class="task-list">
       <button class="task-card" type="button" data-task="sabaq">
         <span class="task-kind">1 &middot; Sabaq</span>
-        <span class="task-title">New lesson &middot; An-Naba 21&ndash;26</span>
-        <span class="task-sub">6 new ayahs to learn</span>
+        <span class="task-title" id="taskTitleSabaq">New lesson &middot; An-Naba 21&ndash;26</span>
+        <span class="task-sub" id="taskSubSabaq">6 new ayahs to learn</span>
         <span class="task-min" id="taskMinSabaq">18 min</span>
         <span class="task-done" id="taskDoneSabaq" hidden>Done &#10003;</span>
       </button>
 
       <button class="task-card" type="button" data-task="sabqi">
         <span class="task-kind">2 &middot; Sabqi</span>
-        <span class="task-title">Recent review &middot; An-Naba 1&ndash;20</span>
-        <span class="task-sub">Fix 3 words from yesterday</span>
+        <span class="task-title" id="taskTitleSabqi">Recent review &middot; An-Naba 1&ndash;20</span>
+        <span class="task-sub" id="taskSubSabqi">Fix 3 words from yesterday</span>
         <span class="task-min" id="taskMinSabqi">15 min</span>
         <span class="task-done" id="taskDoneSabqi" hidden>Done &#10003;</span>
       </button>
 
       <button class="task-card" type="button" data-task="manzil">
         <span class="task-kind">3 &middot; Manzil</span>
-        <span class="task-title">Old review &middot; Al-Mulk 1&ndash;12</span>
-        <span class="task-sub">Keep old verses fresh</span>
+        <span class="task-title" id="taskTitleManzil">Old review &middot; Al-Mulk 1&ndash;12</span>
+        <span class="task-sub" id="taskSubManzil">Keep old verses fresh</span>
         <span class="task-min" id="taskMinManzil">12 min</span>
         <span class="task-done" id="taskDoneManzil" hidden>Done &#10003;</span>
       </button>
     </div>
 
+    <button class="ghost-btn" type="button" id="loopLiveBtn">&#127908; Live feedback &mdash; recite with the ear</button>
+
     <!-- Practice check — LIVE listening (Web Speech API), ported from v2 as-is -->
     <div class="practice" id="practicePanel" hidden>
       <p class="practice-label">Live listening (beta)</p>
-      <p class="practice-task" id="practiceTask">Sabaq &middot; Al-Fatiha 1:1</p>
-      <p class="practice-surah">Verse <span id="practiceVerseNum">1 of 11</span> &middot; <span id="practiceQiraat">Hafs</span></p>
+      <p class="practice-task" id="practiceTask">Sabaq &middot; An-Naba 78:21</p>
+      <p class="practice-surah">Verse <span id="practiceVerseNum">1 of 6</span> &middot; <span id="practiceQiraat">Hafs</span></p>
       <p class="verse" id="practiceVerse" dir="rtl" lang="ar"></p>
       <p class="verse-translation" id="practiceTranslit"></p>
-      <p class="practice-progress" id="practiceProgress">Verse 1 of 11 &middot; best &mdash;</p>
+      <p class="practice-progress" id="practiceProgress">Verse 1 of 6 &middot; best &mdash;</p>
 
       <button class="mic-btn" type="button" id="micBtn" aria-label="Tap and recite">
         <span class="mic-icon" aria-hidden="true">&#127908;</span>
         <span class="mic-text" id="micBtnText">Tap and recite</span>
       </button>
+      <p class="ear-line" id="earLine" hidden></p>
       <p class="practice-status" id="practiceStatus" aria-live="polite"></p>
       <p class="heard-line interim" id="interimLine" hidden><strong>Listening&hellip;</strong> <span id="interimText"></span></p>
       <p class="heard-line" id="heardLine" hidden><strong>What I heard:</strong> <span id="heardText"></span></p>
@@ -214,6 +324,16 @@
       <button class="ghost-btn" type="button" id="practiceClose">Back to today&rsquo;s plan</button>
     </div>
 
+    <!-- Level-check result (diagnostic mode only) -->
+    <div class="diag-result" id="diagResult" hidden>
+      <p class="diag-level" id="diagLevel"></p>
+      <p class="diag-start" id="diagStartSurah"></p>
+      <div class="practice-actions">
+        <button class="ghost-btn" type="button" id="diagRetake">Retake the check</button>
+        <button class="primary-btn" type="button" id="diagStartLearning">Start learning &rarr;</button>
+      </div>
+    </div>
+
     <h2 class="juz-title">Your 30-juz map</h2>
     <div class="juz-grid" id="juzGrid" aria-label="30-juz progress map"></div>
     <p class="juz-legend">
@@ -221,7 +341,7 @@
       <span class="legend-item"><span class="dot dot-progress"></span>In progress</span>
       <span class="legend-item"><span class="dot dot-todo"></span>Not started</span>
     </p>
-    <p class="hint">Juz 30 in progress &middot; the rest not started yet. Sample data.</p>
+    <p class="hint">Tap a juz to start learning it. Juz 30 in progress &middot; the rest not started yet. Sample data.</p>
   </section>
 
   <!-- ============ SCREEN 5 — PARENT DASHBOARD (PREVIEW) ============ -->
@@ -278,6 +398,8 @@
       <p class="read-surah-en" id="readSurahEn"></p>
       <p class="read-surah-meta" id="readSurahMeta"></p>
     </div>
+    <button class="primary-btn learn-surah-btn" type="button" id="learnThisSurahBtn">Learn this surah &rarr;</button>
+    <button class="ghost-btn learn-surah-btn" type="button" id="liveFeedbackBtn">&#127908; Practice live &mdash; recite with the ear</button>
     <p class="bismillah" id="readBismillah" dir="rtl" lang="ar" hidden>بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</p>
     <div class="translation-note" id="translationNote" hidden>
       English translation is not bundled in this version yet — the Arabic text and transliteration are shown below.
@@ -317,7 +439,7 @@
       </div>
       <div class="settings-row">
         <label>Repeat one ayah</label>
-        <button class="toolbar-btn" type="button" id="repeatOneBtn" style="flex:0 0 120px;background:var(--emerald);">Off</button>
+        <button class="toolbar-btn" type="button" id="repeatOneBtn" style="flex:0 0 120px;background:var(--ink);">Off</button>
       </div>
       <div class="settings-row">
         <label>Repeat a range</label>
@@ -341,7 +463,7 @@
       </div>
       <div class="settings-row">
         <label>Transliteration</label>
-        <button class="toolbar-btn" type="button" id="translitBtn" style="flex:0 0 120px;background:var(--emerald);">On</button>
+        <button class="toolbar-btn" type="button" id="translitBtn" style="flex:0 0 120px;background:var(--ink);">On</button>
       </div>
       <div class="settings-row">
         <label>Download this surah</label>
@@ -363,6 +485,97 @@
     <div class="reciter-list" id="reciterList"></div>
     <p class="no-results" id="reciterNoResults" hidden>No Results</p>
     <p class="credits-line">Audio: everyayah.com / VerseByVerseQuran.com / QuranicAudio.com</p>
+  </section>
+
+  <!-- ============ SCREEN 9 — LIVE FEEDBACK (v3) ============ -->
+  <section class="screen" id="screen-live" data-screen="live" aria-label="Live feedback">
+    <button class="back-btn" type="button" data-goto="read">&larr; Back to reading</button>
+    <h1 class="screen-title">Live feedback</h1>
+    <p class="screen-sub">Recite &mdash; words turn gold as the ear hears them.</p>
+    <p class="live-honest">Word check only &mdash; it does not check tajweed. The ear can mishear, so a red word is a question, not a verdict. Tap a red word to see what it heard, or dismiss the flag.</p>
+
+    <div class="live-range">
+      <p class="live-surah" id="liveSurahLine">Al-Fatiha</p>
+      <span class="live-range-fields">
+        <label for="liveFrom">Ayahs</label>
+        <input type="number" id="liveFrom" min="1" value="1" aria-label="From ayah" />
+        &ndash;
+        <input type="number" id="liveTo" min="1" value="5" aria-label="To ayah" />
+        <button class="ghost-btn live-apply" type="button" id="liveApplyRange">Apply</button>
+      </span>
+      <button class="ghost-btn live-apply" type="button" id="liveChangeSurah">Change surah</button>
+    </div>
+
+    <div class="cap-modes" role="group" aria-label="How to learn">
+      <button class="cap-mode is-on" type="button" data-capmode="beginner">Beginner</button>
+      <button class="cap-mode" type="button" data-capmode="medium">Medium</button>
+      <button class="cap-mode" type="button" data-capmode="harder">Harder</button>
+      <button class="cap-mode" type="button" data-capmode="diagnostic">Diagnostic</button>
+    </div>
+    <p class="cap-mode-note" id="capModeNote">Full caption on screen — words light up gold as you recite them.</p>
+
+    <div class="cap-fonts" role="group" aria-label="Quran font">
+      <span class="cap-fonts-label">Script</span>
+      <button class="cap-font is-on" type="button" data-capfont="uthmani">Uthmani</button>
+      <button class="cap-font" type="button" data-capfont="alkalami">West African</button>
+      <button class="cap-font" type="button" data-capfont="kufi">Kufic</button>
+    </div>
+
+    <button class="ghost-btn cap-teacher" type="button" id="liveTeacherBtn">&#9654; Listen to your teacher</button>
+    <p class="cap-teacher-note" id="liveTeacherNote">Hear line 1 first, up to 3 times — then you recite.</p>
+
+    <p class="live-ayah" id="liveAyahRef">Al-Fatiha 1:1 &middot; Ayah 1 of 5</p>
+    <p class="live-verse cap-line" id="liveVerse" dir="rtl" lang="ar"></p>
+    <!-- v4b: current-word detail strip — the word you are on, big, with
+         its full grammar (POS + every sub-pill) and gloss. -->
+    <div class="cap-detail" id="capDetail" hidden>
+      <div class="cap-detail-pills" id="capDetailPills"></div>
+      <div class="cap-detail-ar" id="capDetailAr" dir="rtl" lang="ar"></div>
+      <div class="cap-detail-gloss" id="capDetailGloss"></div>
+      <div class="cap-detail-state" id="capDetailState"></div>
+    </div>
+    <p class="verse-translation" id="liveTranslit"></p>
+    <p class="live-score" id="liveScoreLine">Heard 0 of 7 words</p>
+
+    <button class="mic-btn" type="button" id="liveMicBtn" aria-label="Tap and recite">
+      <span class="mic-icon" aria-hidden="true">&#127908;</span>
+      <span class="mic-text" id="liveMicBtnText">Tap and recite</span>
+    </button>
+    <p class="ear-line" id="liveEarLine" hidden></p>
+    <p class="practice-status" id="liveStatus" aria-live="polite"></p>
+    <p class="heard-line interim" id="liveInterimLine" hidden><strong>Listening&hellip;</strong> <span id="liveInterimText"></span></p>
+    <p class="heard-line" id="liveHeardLine" hidden><strong>What I heard:</strong> <span id="liveHeardText"></span></p>
+
+    <div class="live-toggle-row">
+      <span class="live-toggle-label">Don&rsquo;t move on until it&rsquo;s fixed</span>
+      <button class="toolbar-btn live-toggle" type="button" id="liveHoldToggle" aria-pressed="false">Off</button>
+    </div>
+    <p class="live-hold-note" id="liveHoldNote" hidden>Fix the red words to move on &mdash; or turn this off.</p>
+
+    <div class="live-nav">
+      <button class="ghost-btn" type="button" id="livePrevBtn">&larr; Prev</button>
+      <button class="primary-btn" type="button" id="liveDoneBtn">Done</button>
+      <button class="primary-btn" type="button" id="liveNextBtn">Next &rarr;</button>
+    </div>
+
+    <div class="live-summary" id="liveSummary" hidden>
+      <p class="live-summary-title" id="liveSummaryTitle"></p>
+      <p class="live-summary-line" id="liveSummaryLine"></p>
+      <div class="diag-report" id="liveDiagReport" hidden>
+        <p class="diag-report-title" id="liveDiagReportTitle"></p>
+        <p class="diag-report-line" id="liveDiagReportLine"></p>
+      </div>
+      <div class="practice-actions">
+        <button class="ghost-btn" type="button" id="liveTryAgainBtn">Try this ayah again</button>
+        <button class="primary-btn" type="button" id="liveSummaryNextBtn">Next ayah &rarr;</button>
+      </div>
+    </div>
+
+    <h2 class="juz-title">Mistakes to fix</h2>
+    <p class="live-history-note" id="liveHistoryNote">Nothing flagged yet &mdash; recite and any missed word shows up here.</p>
+    <div class="live-history" id="liveHistory"></div>
+    <button class="ghost-btn" type="button" id="liveClearHistoryBtn">Clear mistake history</button>
+    <button class="ghost-btn" type="button" id="liveCloseBtn">Back to today&rsquo;s plan</button>
   </section>
 
 </main>
@@ -411,6 +624,25 @@
     <span class="nav-label">Family</span>
   </button>
 </nav>
+
+<!-- (v4b: the account sheet is gone — guest only, no sign-in anywhere.) -->
+
+<!-- Live-feedback correction sheet -->
+<div class="sheet-overlay" id="liveSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Word correction">
+    <button class="sheet-close" id="liveSheetClose" type="button" aria-label="Close">&times;</button>
+    <h2 class="sheet-title" id="liveSheetTitle">This word</h2>
+    <p class="sheet-text" id="liveSheetHeard">You said: &mdash;</p>
+    <p class="sheet-text" id="liveSheetCorrect">Correct: &mdash;</p>
+    <p class="sheet-text" id="liveSheetWordInfo" hidden></p>
+    <p class="sheet-note" id="liveSheetNote">The ear can mishear &mdash; if you said it right, dismiss the flag.</p>
+    <div class="sheet-actions">
+      <button class="primary-btn" type="button" id="liveSheetRetry">Try this word again</button>
+      <button class="ghost-btn" type="button" id="liveSheetDismiss">Dismiss this flag</button>
+      <button class="ghost-btn" type="button" id="liveSheetCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
 
 <audio id="audioEl" preload="auto"></audio>
 <script src="app.js"></script>
