@@ -1,16 +1,22 @@
-/* Sabaq v4 — caption recitation: word-by-word captions with grammar pills
-   + English glosses (Marhaba-style function, Sabaq's own emerald + gold look).
-   New flow: animated intro -> guest only -> choose your plan -> today's
-   lesson (resumes where you left off) -> caption recitation in 3 modes
-   (Beginner / Medium / Harder) with a teacher-audio button (max 3 listens)
-   and a 3-font picker (Uthmani / West African / Kufic).
+/* Sabaq v5 — retransform (Nov 4, 2026). Placement front door, Today as
+   home (quest + 3 tiers + due strip), full-screen lesson stage + recap,
+   flowing Mushaf page, Progress (journey map + XP + badges + analytics +
+   parent view), 29-stage beginner path. Built on the v4c engine (SM-2,
+   streaks, badges, XP, daily quest, Hifz rule) — that engine is untouched.
    The ear is the same Groq Worker as v3 (SABAQ_EAR_URL); the live engine
-   (2.5 s cumulative slices, LCS scoring, no prompt) is reused unchanged.
-   Word data: data/words.json — Quranic Arabic Corpus morphology v0.4
-   (POS + grammar features) + word-by-word English glosses. A word with no
-   data shows Arabic only; no gloss or tag is ever invented.
-   Small static site: index.html + app.js + style.css + data/quran.json +
-   data/reciters.json + data/words.json. Runs over HTTP, NOT file://. */
+   (2.5 s cumulative slices, LCS scoring, no prompt) is reused unchanged,
+   and placement uses the same ear and scorer. Word data: data/words.json
+   — Quranic Arabic Corpus morphology v0.4 (POS + grammar features) +
+   word-by-word English glosses. A word with no data shows Arabic only;
+   no gloss or tag is ever invented. Small static site: index.html +
+   app.js + style.css + data/quran.json + data/reciters.json +
+   data/words.json. Runs over HTTP, NOT file://.
+   Deleted in v5 (spec §2.3): the Home mode picker, the plan picker as a
+   front door, the Time screen (folded into Today), the Loop screen and
+   the v2 practice check, the Family screen (sample children — never
+   recreated), the Qira'at picker screen (now a sheet), the inline read
+   settings panel (now a sheet), the v2 3-verse diagnostic (replaced by
+   placement). */
 
 (function () {
   "use strict";
@@ -41,13 +47,6 @@
     120: [48, 40, 32]
   };
 
-  var MODE_LABELS = {
-    beginner: "Beginner",
-    returner: "Returner",
-    adult: "Adult",
-    parent: "Parent / Family"
-  };
-
   // Verse bank for the live practice check (v2, unchanged).
   var VERSE_BANK = [
     { ref: "Al-Fatiha 1:1", arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", translit: "Bismillaahir-Rahmaanir-Raheem" },
@@ -74,8 +73,7 @@
   /* ---------- State ---------- */
 
   var state = {
-    mode: null,
-    qiraat: null,
+    qiraat: "hafs", // default: Hafs first (spec §5/§6); loadState may restore Warsh
     minutes: 45,
     screen: "home",
     task: "sabaq",
@@ -92,7 +90,6 @@
   function saveState() {
     try {
       sessionStorage.setItem("sabaq-v1", JSON.stringify({
-        mode: state.mode,
         qiraat: state.qiraat,
         minutes: state.minutes,
         chosenSurah: state.chosenSurah
@@ -105,7 +102,6 @@
       var raw = sessionStorage.getItem("sabaq-v1");
       if (!raw) { return; }
       var saved = JSON.parse(raw);
-      if (saved.mode && MODE_LABELS[saved.mode]) { state.mode = saved.mode; }
       if (saved.qiraat === "hafs" || saved.qiraat === "warsh") { state.qiraat = saved.qiraat; }
       if (SPLITS[saved.minutes]) { state.minutes = saved.minutes; }
       if (typeof saved.chosenSurah === "number" && saved.chosenSurah >= 1 && saved.chosenSurah <= 114) {
@@ -217,6 +213,10 @@
 
   /* ---------- Navigation ---------- */
 
+  /* v5 navigation: 3 tabs (Today / Mushaf / Progress). The top bar,
+     bottom nav and footer are hidden on the full-screen lesson stage,
+     the placement flow and the intro (the front door has no nav). */
+  var FULLSCREEN_SCREENS = { live: true, placement: true, intro: true };
   function showScreen(name) {
     state.screen = name;
     forEach(document.querySelectorAll(".screen"), function (s) {
@@ -225,10 +225,29 @@
     forEach(document.querySelectorAll(".nav-btn"), function (b) {
       b.classList.toggle("is-active", b.getAttribute("data-goto") === name);
     });
-    if (name !== "loop") { closePractice(); }
+    document.body.classList.toggle("stage-open", !!FULLSCREEN_SCREENS[name]);
+    closeSheets();
     if (name !== "live") { stopLiveListening(); }
-    if (name === "home") { renderStreakCard(); }
+    if (name === "today") { renderToday(); }
+    if (name === "progress") { renderProgress(); }
+    if (name === "beginner") { renderBeginnerPath(); }
     window.scrollTo(0, 0);
+  }
+
+  /* Sheets: the only overlay pattern in v5. Opening one closes any other. */
+  function openSheet(id) {
+    closeSheets();
+    var sh = el(id);
+    if (sh) { sh.hidden = false; }
+  }
+  function closeSheets() {
+    forEach(document.querySelectorAll(".sheet-overlay"), function (sh) {
+      sh.hidden = true;
+    });
+  }
+  function closeSheet(id) {
+    var sh = el(id);
+    if (sh) { sh.hidden = true; }
   }
 
   /* ---------- UI updates (v2) ---------- */
@@ -239,26 +258,15 @@
       : "Reading: —";
   }
 
-  function updateSummary() {
-    var parts = [];
-    parts.push(state.mode ? MODE_LABELS[state.mode] : "Pick a mode");
-    parts.push(state.qiraat ? (state.qiraat === "hafs" ? "Hafs" : "Warsh") : "Pick a reading");
-    parts.push(state.minutes + " minutes");
-    el("planSummary").textContent = parts.join(" · ");
-  }
-
   function updateSplit() {
     var split = SPLITS[state.minutes];
     var total = state.minutes;
-    el("barSabaq").style.width = Math.round(split[0] / total * 100) + "%";
-    el("barSabqi").style.width = Math.round(split[1] / total * 100) + "%";
-    el("barManzil").style.width = Math.round(split[2] / total * 100) + "%";
-    el("minSabaq").textContent = split[0] + " min";
-    el("minSabqi").textContent = split[1] + " min";
-    el("minManzil").textContent = split[2] + " min";
-    el("taskMinSabaq").textContent = split[0] + " min";
-    el("taskMinSabqi").textContent = split[1] + " min";
-    el("taskMinManzil").textContent = split[2] + " min";
+    var ms = el("minSabaq"), mq = el("minSabqi"), mz = el("minManzil");
+    if (ms) { ms.textContent = split[0] + " min"; }
+    if (mq) { mq.textContent = split[1] + " min"; }
+    if (mz) { mz.textContent = split[2] + " min"; }
+    var tv = el("timeTodayVal");
+    if (tv) { tv.textContent = total + " min"; }
   }
 
   function markSelected(selector, valueAttr, value) {
@@ -388,703 +396,11 @@
     };
   }
 
-  /* ---------- Live practice check (v2, unchanged) ---------- */
-
-  var verseIndex = 0;
-  // The loop cards promise specific verses (Sabaq: An-Naba 21-26, Sabqi:
-  // An-Naba 1-20, Manzil: Al-Mulk 1-12). The check MUST test THOSE verses.
-  // Bug: the panel always drew from the old Fatiha/Ikhlas bank, so tapping
-  // the Sabaq card showed "Al-Fatiha 1:1" and any An-Naba recitation scored
-  // as entirely missing. Each task's list is built from the bundled Quran
-  // data; the old bank survives only as a fallback if the data fails to load.
-  var TASK_RANGES = {
-    sabaq: { surah: 78, from: 21, to: 26 },
-    sabqi: { surah: 78, from: 1, to: 20 },
-    manzil: { surah: 67, from: 1, to: 12 }
-  };
-  var taskVerses = { sabaq: null, sabqi: null, manzil: null };
-  var taskIndex = { sabaq: 0, sabqi: 0, manzil: 0 };
-  var bestScores = { sabaq: {}, sabqi: {}, manzil: {} };
-  var activeVerses = VERSE_BANK; // fallback until the Quran data loads
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var rec = null;
-  var listening = false;
-  var listenStart = 0;
-  var restarts = 0;
-  var finalTranscript = "";
-  var lastResult = null;
-
-  var TASK_LABELS = { sabaq: "Sabaq", sabqi: "Sabqi", manzil: "Manzil", diag: "Level check" };
-
-  /* ---------- Choose what to learn (layout fix, Nov 2) ----------
-     The default plan is An-Naba / Al-Mulk. When the user picks a surah
-     (surah picker, juz map, or the level check), the plan rebuilds around
-     THAT surah instead: Sabaq = its first 6 ayahs, Sabqi = the next chunk,
-     Manzil = the old review (Al-Mulk, or Al-Fatiha if the chosen surah
-     IS Al-Mulk). Nothing is chosen = the default plan, unchanged. */
-  function currentTaskRanges() {
-    if (state.chosenSurah && quranData) {
-      var surah = getSurah(state.chosenSurah);
-      if (surah) {
-        var n = surah.ayahs.length;
-        return {
-          sabaq: { surah: surah.number, from: 1, to: Math.min(6, n) },
-          sabqi: n > 6
-            ? { surah: surah.number, from: 7, to: Math.min(26, n) }
-            : { surah: surah.number, from: 1, to: n },
-          manzil: surah.number === 67
-            ? { surah: 1, from: 1, to: 7 }
-            : { surah: 67, from: 1, to: 12 }
-        };
-      }
-    }
-    return TASK_RANGES;
-  }
-
-  function renderLearningLine() {
-    var name = el("learningSurahName");
-    if (!name) { return; }
-    var surah = state.chosenSurah ? getSurah(state.chosenSurah) : getSurah(78);
-    name.textContent = surah ? surah.englishName : "An-Naba";
-  }
-
-  function renderTaskCards() {
-    if (!quranData) { return; }
-    var ranges = currentTaskRanges();
-    var kinds = { sabaq: "New lesson", sabqi: "Recent review", manzil: "Old review" };
-    ["sabaq", "sabqi", "manzil"].forEach(function (task) {
-      var r = ranges[task];
-      var surah = getSurah(r.surah);
-      if (!surah) { return; }
-      var cap = task.charAt(0).toUpperCase() + task.slice(1);
-      var title = el("taskTitle" + cap);
-      var sub = el("taskSub" + cap);
-      if (title) {
-        title.textContent = kinds[task] + " · " + surah.englishName + " " + r.from + "–" + r.to;
-      }
-      if (sub) {
-        if (task === "sabaq") { sub.textContent = (r.to - r.from + 1) + " new ayahs to learn"; }
-        else if (task === "sabqi") {
-          sub.textContent = state.chosenSurah
-            ? "Review " + (r.to - r.from + 1) + " ayahs"
-            : "Fix 3 words from yesterday";
-        } else { sub.textContent = "Keep old verses fresh"; }
-      }
-    });
-    renderLearningLine();
-  }
-
-  function setChosenSurah(num) {
-    if (!quranData) { return false; }
-    var surah = getSurah(num);
-    if (!surah) { return false; }
-    state.chosenSurah = num;
-    saveState();
-    // Fresh start for the new lesson — the stored verse index belongs to
-    // the old ranges and may not exist in the new ones.
-    taskIndex = { sabaq: 0, sabqi: 0, manzil: 0 };
-    buildTaskVerses();
-    renderTaskCards();
-    return true;
-  }
-
-  function chooseSurah(num) {
-    if (!setChosenSurah(num)) { return false; }
-    showScreen("loop");
-    return true;
-  }
-
-  function currentVerse() { return activeVerses[verseIndex]; }
-
-  function buildTaskVerses() {
-    if (!quranData) { return; }
-    var ranges = currentTaskRanges();
-    Object.keys(ranges).forEach(function (task) {
-      var r = ranges[task];
-      var surah = getSurah(r.surah);
-      if (!surah) { return; }
-      var list = [];
-      surah.ayahs.forEach(function (a) {
-        if (a.numberInSurah >= r.from && a.numberInSurah <= r.to) {
-          list.push({
-            ref: surah.englishName + " " + r.surah + ":" + a.numberInSurah,
-            arabic: stripLeadingBismillah(a.text),
-            translit: a.translit || ""
-          });
-        }
-      });
-      if (list.length) { taskVerses[task] = list; }
-    });
-    if (taskVerses[state.task]) { activeVerses = taskVerses[state.task]; }
-  }
-
-  function saveProgress() {
-    try {
-      localStorage.setItem("sabaq-v2", JSON.stringify({ v: 2, per: {
-        sabaq: { i: taskIndex.sabaq, best: bestScores.sabaq },
-        sabqi: { i: taskIndex.sabqi, best: bestScores.sabqi },
-        manzil: { i: taskIndex.manzil, best: bestScores.manzil }
-      }}));
-    } catch (e) {}
-  }
-
-  function loadProgress() {
-    try {
-      var raw = localStorage.getItem("sabaq-v2");
-      if (!raw) { return; }
-      var saved = JSON.parse(raw);
-      if (!saved.per) { return; } // v1 shape (one global verseIndex) — start fresh per task
-      Object.keys(taskIndex).forEach(function (task) {
-        var p = saved.per[task];
-        if (!p) { return; }
-        if (typeof p.i === "number") { taskIndex[task] = p.i; }
-        if (p.best) { bestScores[task] = p.best; }
-      });
-    } catch (e) {}
-  }
-
-  function updateProgressLine() {
-    if (state.task === "diag") {
-      el("practiceProgress").textContent = "Verse " + (verseIndex + 1) + " of " + activeVerses.length + " · level check";
-      return;
-    }
-    var best = (bestScores[state.task] || {})[verseIndex];
-    el("practiceProgress").textContent = "Verse " + (verseIndex + 1) + " of " + activeVerses.length +
-      " · best " + (typeof best === "number" ? best + "%" : "—");
-  }
-
-  function renderVerse() {
-    var v = currentVerse();
-    var words = v.arabic.split(/\s+/);
-    var html = "";
-    words.forEach(function (w) {
-      html += '<span class="word word-neutral">' + w + "</span> ";
-    });
-    el("practiceVerse").innerHTML = html;
-    el("practiceTranslit").textContent = v.translit;
-    el("practiceTask").textContent = (TASK_LABELS[state.task] || "Sabaq") + " · " + v.ref;
-    el("practiceVerseNum").textContent = (verseIndex + 1) + " of " + activeVerses.length;
-    el("practiceQiraat").textContent = state.qiraat === "warsh" ? "Warsh" : "Hafs";
-    el("practiceNext").textContent = (state.task === "diag" && verseIndex >= activeVerses.length - 1)
-      ? "See my level →" : "Next verse";
-    updateProgressLine();
-  }
-
-  function renderColored(result) {
-    var v = currentVerse();
-    var words = v.arabic.split(/\s+/);
-    var matchedSet = {};
-    result.matched.forEach(function (i) { matchedSet[i] = true; });
-    var html = "";
-    words.forEach(function (w, i) {
-      var cls = matchedSet[i] ? "word-good" : "word-missed";
-      html += '<span class="word ' + cls + '">' + w + "</span> ";
-    });
-    el("practiceVerse").innerHTML = html;
-  }
-
-  function setMicUI(isListening) {
-    el("micBtn").classList.toggle("is-listening", isListening);
-    el("micBtnText").textContent = isListening ? "Tap to stop" : "Tap and recite";
-  }
-
-  function showMicError(msg) {
-    var s = el("practiceStatus");
-    s.textContent = msg;
-    s.classList.add("practice-error");
-  }
-
-  function clearMicError() {
-    el("practiceStatus").classList.remove("practice-error");
-  }
-
-  /* ---------- Groq ear (Whisper) ---------- */
-  // Records a short clip with MediaRecorder, POSTs it to the sabaq-ear
-  // Worker, and scores the returned transcript with the SAME scorer and
-  // result display as the browser check. No key lives in the app — the
-  // Worker holds it server-side. Any failure falls back to the browser
-  // check (once per tap) and says so in plain language.
-
-  function setEarLine(ear) {
-    earInUse = ear;
-    var line = el("earLine");
-    if (!line) { return; }
-    if (ear === EAR_GROQ) {
-      line.textContent = "Checking with Groq — the AI ear";
-    } else if (ear === EAR_BROWSER) {
-      line.textContent = "Checking in your browser";
-    } else {
-      line.textContent = "";
-    }
-    line.hidden = !ear;
-  }
-
+  /* ---------- Groq ear availability (kept; the v2 practice check and
+     the v2 3-verse diagnostic were deleted in v5 — placement and the
+     live engine replace them) ---------- */
   function groqAvailable() {
     return !!SABAQ_EAR_URL && typeof MediaRecorder !== "undefined";
-  }
-
-  function startGroqCheck() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showMicError("Live listening needs Chrome or Edge — open this file in one of those.");
-      return;
-    }
-    el("practiceResult").hidden = true;
-    el("heardLine").hidden = true;
-    el("interimLine").hidden = true;
-    clearMicError();
-    setEarLine(EAR_GROQ);
-    el("practiceStatus").textContent = "Getting the mic ready…";
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-      var mime = "";
-      ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].forEach(function (m) {
-        if (!mime && window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) { mime = m; }
-      });
-      groqChunks = [];
-      try {
-        mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      } catch (e) {
-        stream.getTracks().forEach(function (t) { t.stop(); });
-        showMicError("Recording could not start — tap the mic to try again.");
-        return;
-      }
-      mediaRecorder.ondataavailable = function (ev) {
-        if (ev.data && ev.data.size) { groqChunks.push(ev.data); }
-      };
-      mediaRecorder.onstop = function () {
-        stream.getTracks().forEach(function (t) { t.stop(); });
-        // If the user closed the panel mid-recording, do not send anything.
-        if (el("practicePanel").hidden) { groqBusy = false; listening = false; setMicUI(false); return; }
-        sendGroqClip();
-      };
-      mediaRecorder.start(250);
-      groqBusy = true;
-      listening = true;
-      setMicUI(true);
-      el("practiceStatus").textContent = "Recording… tap to stop";
-      groqTimer = setTimeout(function () { stopGroqRecording(); }, GROQ_MAX_MS);
-    }).catch(function () {
-      showMicError("Mic is blocked — tap the mic icon in the address bar and allow it, then try again.");
-    });
-  }
-
-  function stopGroqRecording() {
-    if (groqTimer) { clearTimeout(groqTimer); groqTimer = null; }
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      try { mediaRecorder.stop(); } catch (e) {}
-    }
-  }
-
-  async function sendGroqClip() {
-    groqBusy = true;
-    listening = false;
-    setMicUI(false);
-    el("practiceStatus").textContent = "Checking with Groq…";
-    var type = (groqChunks[0] && groqChunks[0].type) || "audio/webm";
-    var blob = new Blob(groqChunks, { type: type });
-    groqChunks = [];
-    if (!blob.size) {
-      finishGroqHeard("");
-      return;
-    }
-    var form = new FormData();
-    form.append("file", blob, "recitation.webm");
-    form.append("language", "ar");
-    var res;
-    try {
-      res = await fetch(SABAQ_EAR_URL, { method: "POST", body: form });
-    } catch (e) {
-      groqFallback("Groq did not answer — checking in your browser instead.");
-      return;
-    }
-    var data = null;
-    try { data = await res.json(); } catch (e) {}
-    if (!res.ok) {
-      var msg = (data && data.error) || "Groq did not answer.";
-      groqFallback(msg + " Checking in your browser instead.");
-      return;
-    }
-    var transcript = data && typeof data.text === "string" ? data.text : "";
-    finishGroqHeard(transcript);
-  }
-
-  function finishGroqHeard(transcript) {
-    groqBusy = false;
-    listening = false;
-    setMicUI(false);
-    setEarLine(EAR_GROQ);
-    finalTranscript = transcript;
-    finishListening();
-  }
-
-  function groqFallback(msg) {
-    groqBusy = false;
-    listening = false;
-    setMicUI(false);
-    setEarLine(EAR_BROWSER);
-    if (groqFailedOnce) {
-      // Already fell back once on this tap — say so plainly and stop.
-      showMicError(msg || "The Groq check did not work — tap the mic to try again.");
-      return;
-    }
-    groqFailedOnce = true;
-    startListening(); // Web Speech path
-    // startListening() sets its own status line; put the reason back on top.
-    el("practiceStatus").textContent = msg || "Groq did not answer — checking in your browser instead.";
-  }
-
-  function startListening() {
-    if (!SR) {
-      showMicError("Live listening needs Chrome or Edge — open this file in one of those.");
-      return;
-    }
-    try {
-      rec = new SR();
-    } catch (e) {
-      showMicError("Live listening could not start — try opening this file in Chrome or Edge.");
-      return;
-    }
-    rec.lang = "ar-SA";
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.maxAlternatives = 1;
-    finalTranscript = "";
-    lastResult = null;
-    restarts = 0;
-    el("practiceResult").hidden = true;
-    el("heardLine").hidden = true;
-    el("interimLine").hidden = true;
-    clearMicError();
-    el("practiceStatus").textContent = "Listening… speak now";
-    rec.onresult = function (ev) {
-      var interim = "";
-      for (var i = ev.resultIndex; i < ev.results.length; i++) {
-        var r = ev.results[i];
-        if (r.isFinal) {
-          finalTranscript += (finalTranscript ? " " : "") + r[0].transcript;
-        } else {
-          interim += r[0].transcript;
-        }
-      }
-      if (interim) {
-        el("interimText").textContent = interim;
-        el("interimLine").hidden = false;
-      }
-    };
-    rec.onerror = function (ev) {
-      var code = ev && ev.error ? ev.error : "unknown";
-      listening = false;
-      setMicUI(false);
-      el("interimLine").hidden = true;
-      if (code === "aborted") { return; }
-      if (code === "not-allowed" || code === "service-not-allowed") {
-        showMicError("Mic is blocked — tap the mic icon in the address bar and allow it, then try again.");
-      } else if (code === "no-speech") {
-        showMicError("I did not hear anything — check your mic and try again.");
-      } else if (code === "network") {
-        showMicError("Listening needs internet right now — check your connection and try again.");
-      } else {
-        showMicError("Listening stopped — tap the mic to try again.");
-      }
-    };
-    rec.onend = function () {
-      if (!listening) { return; }
-      listening = false;
-      setMicUI(false);
-      el("interimLine").hidden = true;
-      if (!finalTranscript.trim() && restarts < 1 && (Date.now() - listenStart) < 3000) {
-        restarts++;
-        startListening();
-        return;
-      }
-      finishListening();
-    };
-    listening = true;
-    listenStart = Date.now();
-    setMicUI(true);
-    try {
-      rec.start();
-    } catch (e) {
-      listening = false;
-      setMicUI(false);
-      showMicError("Listening stopped — tap the mic to try again.");
-    }
-  }
-
-  function toggleMic() {
-    if (listening || groqBusy) {
-      // Stop whichever ear is running.
-      if (mediaRecorder && mediaRecorder.state !== "inactive") { stopGroqRecording(); return; }
-      if (groqBusy) { return; } // upload in flight — let it finish
-      listening = false;
-      try { if (rec) { rec.stop(); } } catch (e) {}
-      finishListening();
-      return;
-    }
-    groqFailedOnce = false;
-    if (groqAvailable()) {
-      startGroqCheck();
-    } else {
-      setEarLine(EAR_BROWSER);
-      startListening();
-    }
-  }
-
-  function finishListening() {
-    setMicUI(false);
-    el("interimLine").hidden = true;
-    clearMicError();
-    var heard = finalTranscript.trim();
-    var v = currentVerse();
-    var words = v.arabic.split(/\s+/);
-    if (!heard) {
-      el("practiceStatus").textContent = "I did not hear anything — try again";
-      el("practiceScore").textContent = "—";
-      el("scoreRing").style.background = "conic-gradient(var(--gold) 0 0%, var(--line) 0% 100%)";
-      el("resultTitle").textContent = "I did not hear anything";
-      el("practiceFeedback").innerHTML = '<p class="fix">No words came through. Check your mic, speak clearly, and try again.</p>';
-      el("practiceMemoryNote").textContent = "";
-      el("heardLine").hidden = true;
-      el("practiceNext").hidden = true;
-      el("practiceResult").hidden = false;
-      el("practiceResult").scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    var result = scoreRecitation(words, heard.split(/\s+/));
-    lastResult = result;
-    renderColored(result);
-    el("heardText").textContent = heard;
-    el("heardLine").hidden = false;
-    var missedWords = result.missed.map(function (i) { return words[i]; });
-    el("practiceScore").textContent = result.score + "%";
-    el("scoreRing").style.background = "conic-gradient(var(--gold) 0 " + result.score + "%, var(--line) " + result.score + "% 100%)";
-    var pass = result.score >= 80;
-    if (result.score === 100) {
-      el("resultTitle").textContent = "Beautiful — all words heard";
-    } else if (pass) {
-      el("resultTitle").textContent = "Good work!";
-    } else {
-      el("resultTitle").textContent = "Almost — try this verse again";
-    }
-    var fb = "";
-    if (result.score === 100) {
-      fb = '<p class="fix">Every word heard. Move on to the next verse when you are ready.</p>';
-    } else if (pass) {
-      fb = '<p class="fix"><strong>Heard ' + (words.length - result.missed.length) + ' of ' + words.length + ' words.</strong> Missed: ' + missedWords.join(" ") + '</p>';
-    } else {
-      fb = '<p class="fix"><strong>Missed:</strong> ' + missedWords.join(" ") + '</p><p class="fix">Listen to the verse above, then recite it again.</p>';
-    }
-    if (result.extras.length) {
-      fb += '<p class="fix">Extra words heard: ' + result.extras.join(" ") + '</p>';
-    }
-    el("practiceFeedback").innerHTML = fb;
-    el("practiceMemoryNote").textContent = pass ? "Memory: verse complete." : "";
-    el("practiceStatus").textContent = "";
-    if (state.task === "diag") {
-      // Level check: record the FIRST score for this verse and always move
-      // on after a scored verse — the recommendation uses first-attempt
-      // scores, so a low score is information, not a failure to retry.
-      if (typeof diagScores[verseIndex] !== "number") { diagScores[verseIndex] = result.score; }
-      el("resultTitle").textContent = pass ? "Nice — well done" : "Noted — let's keep going";
-      el("practiceMemoryNote").textContent = "";
-      el("practiceNext").hidden = false;
-      el("practiceNext").textContent = verseIndex >= activeVerses.length - 1 ? "See my level →" : "Next verse";
-    } else {
-      el("practiceNext").hidden = !pass;
-      el("practiceNext").textContent = "Next verse";
-      if (pass) {
-        var prev = (bestScores[state.task] || {})[verseIndex];
-        if (typeof prev !== "number" || result.score > prev) { bestScores[state.task][verseIndex] = result.score; }
-        saveProgress();
-        updateProgressLine();
-      }
-    }
-    el("practiceResult").hidden = false;
-    el("practiceResult").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function openPractice(task) {
-    state.task = task;
-    lastResult = null;
-    // Point the panel at THIS task's verses (built from the Quran data),
-    // resuming where the user left off in this task.
-    activeVerses = taskVerses[task] || VERSE_BANK;
-    verseIndex = taskIndex[task] || 0;
-    if (!activeVerses[verseIndex]) { verseIndex = 0; }
-    renderVerse();
-    el("diagResult").hidden = true;
-    el("practiceResult").hidden = true;
-    el("practiceStatus").textContent = "";
-    clearMicError();
-    el("heardLine").hidden = true;
-    el("interimLine").hidden = true;
-    setEarLine(null);
-    groqFailedOnce = false;
-    if (!SR && !groqAvailable()) {
-      el("micBtn").disabled = true;
-      showMicError("Live listening needs Chrome or Edge — open this file in one of those.");
-    } else {
-      el("micBtn").disabled = false;
-    }
-    setMicUI(false);
-    el("practicePanel").hidden = false;
-    el("practicePanel").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function closePractice() {
-    if (groqTimer) { clearTimeout(groqTimer); groqTimer = null; }
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      try { mediaRecorder.stop(); } catch (e) {}
-    }
-    groqBusy = false;
-    if (listening) {
-      listening = false;
-      try { if (rec) { rec.stop(); } } catch (e) {}
-    }
-    setMicUI(false);
-    el("practicePanel").hidden = true;
-    el("practiceResult").hidden = true;
-    el("diagResult").hidden = true;
-    el("practiceStatus").textContent = "";
-    clearMicError();
-    el("heardLine").hidden = true;
-    el("interimLine").hidden = true;
-    setEarLine(null);
-  }
-
-  function nextVerse() {
-    if (!lastResult) { return; }
-    if (state.task === "diag") {
-      // Level check: walk the 3 verses, then show the recommendation.
-      if (verseIndex >= activeVerses.length - 1) {
-        showDiagResult();
-      } else {
-        verseIndex++;
-        renderVerse();
-        el("practiceResult").hidden = true;
-        el("heardLine").hidden = true;
-        el("interimLine").hidden = true;
-        clearMicError();
-        el("practiceStatus").textContent = "";
-      }
-      return;
-    }
-    if (lastResult.score < 80) { return; }
-    markTaskDone(state.task);
-    if (verseIndex >= activeVerses.length - 1) {
-      verseIndex = 0;
-      taskIndex[state.task] = 0;
-      saveProgress();
-      renderVerse();
-      el("practiceResult").hidden = true;
-      el("heardLine").hidden = true;
-      el("interimLine").hidden = true;
-      clearMicError();
-      el("practiceStatus").textContent = "You finished all " + activeVerses.length + " verses — starting again from the top.";
-    } else {
-      verseIndex++;
-      taskIndex[state.task] = verseIndex;
-      saveProgress();
-      renderVerse();
-      el("practiceResult").hidden = true;
-      el("heardLine").hidden = true;
-      el("interimLine").hidden = true;
-      clearMicError();
-      el("practiceStatus").textContent = "";
-    }
-  }
-
-  function markTaskDone(task) {
-    state.done[task] = true;
-    var doneEl = el("taskDone" + task.charAt(0).toUpperCase() + task.slice(1));
-    if (doneEl) { doneEl.hidden = false; }
-    var card = document.querySelector('[data-task="' + task + '"]');
-    if (card) { card.classList.add("is-done"); }
-  }
-
-  /* ---------- Level check ("Where are you?", layout fix Nov 2) ----------
-     A SHORT entry check, not the full diagnostic engine: 3 verses
-     (Fatiha 1:1, Ikhlas 112:1, An-Naba 78:1), scored by the same mic/ear
-     check as the daily plan. The recommendation uses first-attempt
-     scores: avg >= 80 -> Returner starting An-Naba; 40-79 -> Beginner
-     starting Al-Ikhlas; below 40 -> Beginner starting Al-Fatiha. */
-  var DIAG_SPECS = [
-    { surah: 1, ayah: 1 },
-    { surah: 112, ayah: 1 },
-    { surah: 78, ayah: 1 }
-  ];
-  var diagVerses = null;
-  var diagScores = [];       // first-attempt score per verse (0-100)
-  var diagRecommendation = null;
-
-  function buildDiagVerses() {
-    if (!quranData) { return; }
-    diagVerses = [];
-    DIAG_SPECS.forEach(function (spec) {
-      var surah = getSurah(spec.surah);
-      if (!surah) { return; }
-      var a = null;
-      surah.ayahs.forEach(function (x) { if (x.numberInSurah === spec.ayah) { a = x; } });
-      if (a) {
-        diagVerses.push({
-          ref: surah.englishName + " " + spec.surah + ":" + spec.ayah,
-          arabic: stripLeadingBismillah(a.text),
-          translit: a.translit || ""
-        });
-      }
-    });
-  }
-
-  function openDiagnostic() {
-    if (!quranData || !diagVerses || !diagVerses.length) { return false; }
-    state.task = "diag";
-    activeVerses = diagVerses;
-    verseIndex = 0;
-    diagScores = [];
-    diagRecommendation = null;
-    el("diagResult").hidden = true;
-    renderVerse();
-    el("practiceResult").hidden = true;
-    el("practiceStatus").textContent = "";
-    clearMicError();
-    el("heardLine").hidden = true;
-    el("interimLine").hidden = true;
-    setEarLine(null);
-    groqFailedOnce = false;
-    if (!SR && !groqAvailable()) {
-      el("micBtn").disabled = true;
-      showMicError("Live listening needs Chrome or Edge — open this file in one of those.");
-    } else {
-      el("micBtn").disabled = false;
-    }
-    setMicUI(false);
-    showScreen("loop");
-    el("practicePanel").hidden = false;
-    el("practicePanel").scrollIntoView({ behavior: "smooth", block: "start" });
-    return true;
-  }
-
-  function computeDiagRecommendation() {
-    var scored = diagScores.filter(function (s) { return typeof s === "number"; });
-    var avg = scored.length
-      ? Math.round(scored.reduce(function (a, b) { return a + b; }, 0) / scored.length)
-      : 0;
-    if (avg >= 80) { return { mode: "returner", surah: 78, avg: avg }; }
-    if (avg >= 40) { return { mode: "beginner", surah: 112, avg: avg }; }
-    return { mode: "beginner", surah: 1, avg: avg };
-  }
-
-  function showDiagResult() {
-    diagRecommendation = computeDiagRecommendation();
-    var surah = getSurah(diagRecommendation.surah);
-    var name = surah ? surah.englishName : "";
-    el("diagLevel").textContent = "Your level: " + MODE_LABELS[diagRecommendation.mode] +
-      " (" + diagRecommendation.avg + "% across 3 verses)";
-    el("diagStartSurah").textContent = "Start with: " + name + " — short, steady verses to build from.";
-    el("diagStartLearning").textContent = "Start learning " + name + " →";
-    el("practicePanel").hidden = true;
-    el("practiceResult").hidden = true;
-    el("diagResult").hidden = false;
-    el("diagResult").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   /* ---------- 30-juz map (v2; tiles became tappable, layout fix Nov 2) ---------- */
@@ -1101,30 +417,56 @@
     });
   }
 
-  // Tapping a juz opens reading at the juz's first ayah AND makes that
-  // surah today's lesson — the map is an entry point, not a picture.
+  // v5: tapping a juz tile opens the Mushaf at that juz's first surah
+  // (spec §7.1). It does not change today's lesson.
   function openJuz(n) {
     if (!quranData || !juzStarts[n]) { return false; }
     var start = juzStarts[n];
     state.currentJuz = n;
-    setChosenSurah(start.surah);
     buildJuzGrid();
     openRead(start.surah);
-    var row = document.querySelector('.ayah-row[data-ayah="' + start.ayah + '"]');
+    var row = document.querySelector('.flow-ayah[data-ayah="' + start.ayah + '"]');
     if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); }
     return true;
   }
 
   /* ---------- 30-juz map (v2) ---------- */
 
+  /* v5 juz map (spec §7.1): completed = solid gold + tick; current =
+     ink + gold pulse ring; in-progress = partial gold fill (bottom-up,
+     real coverage %); untouched = paper. The next lesson's juz gets a
+     gold dot under the tile. A juz is completed only when every ayah in
+     it has been covered by a finished lesson. */
+  function currentJuz() {
+    var sb = sabaqRange();
+    if (sb) { var j = juzFor(sb.surah, sb.from); if (j) { return j; } }
+    return 30;
+  }
+  function juzCoverageCount(j) {
+    var cov = juzCoverage[j] || {};
+    return Object.keys(cov).length;
+  }
   function buildJuzGrid() {
     var grid = el("juzGrid");
+    if (!grid) { return; }
+    var cur = currentJuz();
+    var nextJuz = null;
+    var sb = sabaqRange();
+    if (sb) { nextJuz = juzFor(sb.surah, sb.from); }
     var html = "";
     for (var i = 1; i <= 30; i++) {
+      var total = juzAyahCount(i);
+      var done = juzCoverageCount(i);
       var cls = "juz-tile";
-      if (i === 30) { cls += " in-progress"; }
+      var label = String(i);
+      if (total && done >= total) { cls += " is-done"; label = i + " \u2713"; }
+      else if (i === cur) { cls += " is-current"; }
+      else if (done > 0) { cls += " is-progress"; }
       if (state.currentJuz === i) { cls += " is-selected"; }
-      html += '<button class="' + cls + '" type="button" data-juz="' + i + '" title="Juz ' + i + '">' + i + "</button>";
+      if (nextJuz === i) { cls += " has-next-dot"; }
+      var fill = total ? Math.round(done / total * 100) : 0;
+      html += '<button class="' + cls + '" type="button" data-juz="' + i +
+        '" data-fill="' + fill + '" style="--fill:' + fill + '%" title="Juz ' + i + '">' + label + "</button>";
     }
     grid.innerHTML = html;
     forEach(grid.querySelectorAll("[data-juz]"), function (b) {
@@ -1132,6 +474,11 @@
         openJuz(parseInt(b.getAttribute("data-juz"), 10));
       });
     });
+    var line = el("juzMapLine");
+    if (line) {
+      var total = juzAyahCount(cur);
+      line.textContent = "Juz " + cur + " · " + juzCoverageCount(cur) + " of " + total + " ayahs";
+    }
   }
 
   /* ================= v3: data loading ================= */
@@ -1162,10 +509,9 @@
       renderReciterList("");
       updateReciterButton();
       computeJuzStarts();
-      buildDiagVerses();
-      buildTaskVerses();
-      renderTaskCards();
-      renderLesson(); // pre-fill the v4 lesson screen (tiers + picker)
+      loadPlacement();
+      loadBeginner();
+      renderLesson(); // pre-fill Today (tiers + picker)
       // Render the first surah's reading view so it is ready, but STAY on
       // the intro — fresh load must land on the Basmala, not on Fatiha.
       openRead(1, { scroll: false, show: false });
@@ -1194,12 +540,16 @@
       var hay = (s.englishName + " " + s.name + " " + (s.englishNameTranslation || "") + " " + s.number).toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, "");
       if (q && hay.indexOf(q) === -1) { return; }
       shown++;
+      var cov = surahCoverage[s.number] || {};
+      var doneCount = Object.keys(cov).length;
+      var pct = s.ayahs.length ? Math.round(doneCount / s.ayahs.length * 100) : 0;
       html += '<button class="surah-row" type="button" data-surah="' + s.number + '">' +
         '<span class="surah-num">' + s.number + '</span>' +
         '<span class="surah-names"><span class="surah-name-en">' + s.englishName + '</span><br />' +
         '<span class="surah-name-sub">' + (s.englishNameTranslation || "") + ' · ' + s.revelationType + '</span></span>' +
-        '<span class="surah-name-ar" dir="rtl" lang="ar">' + s.name + '</span>' +
-        '<span class="surah-count">' + s.ayahs.length + ' ayahs</span>' +
+        '<span class="surah-side"><span class="surah-name-ar" dir="rtl" lang="ar">' + s.name + '</span>' +
+        '<span class="surah-count">' + s.ayahs.length + ' ayahs</span></span>' +
+        '<span class="surah-progress"><span class="surah-progress-fill" style="width:' + pct + '%"></span></span>' +
         "</button>";
     });
     list.innerHTML = html;
@@ -1213,6 +563,15 @@
 
   /* ================= v3: Read mode ================= */
 
+  /* v5 Mushaf reading page (spec §6): ayahs flow as continuous RTL
+     text, one after the next, each ending with its number in a
+     gold-ringed ornament. Tapping an ayah plays it (gold wash); tapping
+     a word opens the word sheet (data from words.json only). The
+     Bismillah is stripped from ayah 1 of surahs 2–114 and shown once as
+     a centred line; surah 1's ayah 1 IS the Basmala; surah 9 has none.
+     The translation note shows once per surah, the first time it opens. */
+  var shownTranslationNote = {}; // surah number -> true (this session)
+  var readFont = "uthmani"; // reading-page script: uthmani | alkalami | kufi
   function openRead(surahNum, opts) {
     var surah = getSurah(surahNum);
     if (!surah) { return false; }
@@ -1224,24 +583,44 @@
       surah.revelationType + " · Juz " + surah.ayahs[0].juz;
     // Bismillah line: surah 1 already starts with it as ayah 1; surah 9 has none.
     el("readBismillah").hidden = (surahNum === 1 || surahNum === 9);
-    el("translationNote").hidden = true;
+    var note = el("translationNote");
+    if (!shownTranslationNote[surahNum]) {
+      shownTranslationNote[surahNum] = true;
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+    var warsh = el("warshNote");
+    if (warsh) { warsh.hidden = state.qiraat !== "warsh"; }
     var list = el("ayahList");
     var html = "";
     surah.ayahs.forEach(function (a, i) {
-      html += '<button class="ayah-row" type="button" data-ayah-index="' + i + '" data-ayah="' + a.numberInSurah + '">' +
-        '<span class="ayah-text" dir="rtl" lang="ar">' + stripLeadingBismillah(a.text) +
-        '<span class="ayah-end">' + a.numberInSurah + '</span></span>';
+      var words = captionWordsForAyah(surahNum, a.numberInSurah, a.text);
+      html += '<span class="flow-ayah" data-ayah-index="' + i + '" data-ayah="' + a.numberInSurah + '" role="button" tabindex="0">';
+      words.forEach(function (w, wi) {
+        html += '<span class="flow-word" data-word="' + wi + '">' + escHtml(w.text) + "</span> ";
+      });
+      html += '<span class="ayah-end">' + a.numberInSurah + "</span></span>";
       if (a.translit) {
-        html += '<span class="ayah-translit"' + (state.showTranslit ? "" : ' hidden') + '>' + a.translit + '</span>';
+        html += '<span class="ayah-translit" data-translit-for="' + i + '"' + (state.showTranslit ? "" : " hidden") + ">" + escHtml(a.translit) + "</span>";
       }
       html += '<span class="ayah-audio-error" data-error-for="' + i + '" hidden></span>';
-      html += "</button>";
     });
     list.innerHTML = html;
-    forEach(list.querySelectorAll("[data-ayah-index]"), function (b) {
+    list.setAttribute("data-readfont", readFont);
+    forEach(list.querySelectorAll(".flow-ayah"), function (b) {
       b.addEventListener("click", function () {
         var idx = parseInt(b.getAttribute("data-ayah-index"), 10);
         playAyah(state.currentSurah, idx, { continuous: false });
+      });
+    });
+    forEach(list.querySelectorAll(".flow-word"), function (w) {
+      w.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var ayahEl = w.closest(".flow-ayah");
+        var ayahNum = parseInt(ayahEl.getAttribute("data-ayah"), 10);
+        var wi = parseInt(w.getAttribute("data-word"), 10);
+        openWordSheet(state.currentSurah, ayahNum, wi);
       });
     });
     applyFontSize();
@@ -1252,6 +631,39 @@
     if (!opts || opts.show !== false) { showScreen("read"); }
     if (!opts || opts.scroll !== false) { window.scrollTo(0, 0); }
     return true;
+  }
+
+  /* v5 word sheet: Arabic + gloss + grammar pills, all from words.json.
+     A word with no gloss shows Arabic + grammar only; a word with no
+     data shows Arabic only. Nothing is invented. */
+  var wordSheetAyah = null; // { surah, ayah } the sheet was opened from
+  function openWordSheet(surahNum, ayahNum, wordIndex) {
+    var words = captionWordsForAyah(surahNum, ayahNum,
+      (getSurah(surahNum) && getSurah(surahNum).ayahs[ayahNum - 1]) ? getSurah(surahNum).ayahs[ayahNum - 1].text : "");
+    var w = words[wordIndex];
+    if (!w) { return; }
+    wordSheetAyah = { surah: surahNum, ayah: ayahNum };
+    el("wordSheetAr").textContent = w.text;
+    el("wordSheetGloss").textContent = w.gloss || "";
+    var pills = "";
+    if (w.pos) { pills += '<span class="cap-pill pos">' + escHtml(w.pos) + "</span>"; }
+    (w.subs || []).forEach(function (t) {
+      pills += '<span class="cap-pill sub">' + escHtml(t) + "</span>";
+    });
+    el("wordSheetPills").innerHTML = pills;
+    openSheet("wordSheet");
+  }
+
+  /* Reading-page script: cycles Uthmani -> West African -> Kufic. */
+  function cycleReadFont() {
+    readFont = readFont === "uthmani" ? "alkalami" : readFont === "alkalami" ? "kufi" : "uthmani";
+    var list = el("ayahList");
+    if (list) { list.setAttribute("data-readfont", readFont); }
+    var btn = el("toolbarFont");
+    if (btn) {
+      btn.textContent = readFont === "uthmani" ? "Font · Uthmani"
+        : readFont === "alkalami" ? "Font · West African" : "Font · Kufic";
+    }
   }
 
   function applyFontSize() {
@@ -1302,7 +714,7 @@
   };
 
   function clearHighlight() {
-    forEach(document.querySelectorAll(".ayah-row.is-playing"), function (r) {
+    forEach(document.querySelectorAll(".flow-ayah.is-playing"), function (r) {
       r.classList.remove("is-playing");
     });
   }
@@ -1310,7 +722,7 @@
   function highlightAyah(surahNum, ayahIndex) {
     clearHighlight();
     if (surahNum !== state.currentSurah) { return; }
-    var row = document.querySelector('.ayah-row[data-ayah-index="' + ayahIndex + '"]');
+    var row = document.querySelector('.flow-ayah[data-ayah-index="' + ayahIndex + '"]');
     if (row) {
       row.classList.add("is-playing");
       row.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1571,7 +983,7 @@
     forEach(list.querySelectorAll("[data-reciter]"), function (b) {
       b.addEventListener("click", function () {
         setReciter(b.getAttribute("data-reciter"));
-        showScreen("read");
+        closeSheet("reciterSheet");
       });
     });
   }
@@ -1846,9 +1258,11 @@
     b.disabled = left <= 0;
     b.innerHTML = "&#9654; Listen to your teacher";
     if (note) {
+      // Spec §9.3: the note is exactly this line; after the 3rd listen the
+      // button disappears and no replacement text appears.
       note.textContent = left <= 0
-        ? "You have heard it 3 times — now it is your turn."
-        : "Hear line 1 first, up to 3 times — then you recite. (" + left + " left)";
+        ? ""
+        : "Hear line 1 first, up to 3 times — then you recite.";
     }
   }
 
@@ -2402,36 +1816,39 @@
   }
 
   /* ---------- Rendering (v4c sections) ---------- */
+
+  /* v5 helpers: safe DOM writes (some ids live on only one tab). */
+  function setTxt(id, txt) { var e = el(id); if (e) { e.textContent = txt; } }
+  function setFill(id, pct) { var e = el(id); if (e) { e.style.width = Math.round(pct) + "%"; } }
+  var RING_C = 2 * Math.PI * 26; // 64px ring, r=26
+  function setRing(fillId, numId, done, total) {
+    var f = el(fillId), n = el(numId);
+    var frac = total > 0 ? Math.min(1, done / total) : 0;
+    if (f) {
+      f.style.strokeDasharray = RING_C.toFixed(1);
+      f.style.strokeDashoffset = (RING_C * (1 - frac)).toFixed(1);
+    }
+    if (n) { n.textContent = String(done); }
+  }
+
+  /* v5 Today header (spec §4.1): flame + streak left, XP + level
+     right. No card, no dots row (the 7-day chart lives on Progress). */
   function renderStreakCard() {
-    var card = el("streakCard");
-    if (!card) { return; }
     var today = todayStr();
     var st = streakStats(today);
-    el("streakNum").textContent = String(st.current);
-    el("streakLabel").textContent = st.current === 1 ? "day streak" : "days streak";
-    el("streakBest").textContent = "Best: " + st.best + " day" + (st.best === 1 ? "" : "s");
-    var dots = el("streakDots");
-    dots.innerHTML = "";
-    weekDots(today).forEach(function (d) {
-      var dot = document.createElement("span");
-      dot.className = "streak-dot" + (d.done ? " is-done" : "") + (d.isToday ? " is-today" : "");
-      var c = document.createElement("span");
-      c.className = "dot-circle";
-      dot.appendChild(c);
-      var lbl = document.createElement("span");
-      lbl.textContent = d.label;
-      dot.appendChild(lbl);
-      dots.appendChild(dot);
-    });
-    el("streakNote").textContent = st.current > 0
-      ? (streakDays.indexOf(today) >= 0
-        ? "You learned today — keep it going."
-        : "You did not learn today yet — your streak is waiting.")
-      : "Finish a lesson to start your streak.";
+    setTxt("streakNum", String(st.current));
+    setTxt("streakLabel", st.current === 1 ? "day streak" : "days streak");
+    setTxt("streakBest", "Best: " + st.best + " day" + (st.best === 1 ? "" : "s"));
+    var lv = levelFor(xpTotal());
+    setTxt("todayXpTotal", lv.xp.toLocaleString("en-US") + " XP");
+    setTxt("todayXpLevel", lv.next
+      ? lv.name + " \u00B7 " + lv.xpToNext.toLocaleString("en-US") + " XP to " + lv.next.name
+      : lv.name + " \u00B7 the highest level");
+    setFill("todayXpBarFill", lv.progress * 100);
     var q = questStatus(today);
-    el("streakQuest").textContent = q.done
+    setTxt("streakQuest", q.done
       ? "Daily quest done \u2713 — " + (q.juzDone ? "1 juz finished today." : q.verses + " verses today.")
-      : "Daily quest: " + q.verses + " / " + q.target + " verses";
+      : "Daily quest: " + q.verses + " / " + q.target + " verses");
   }
   function renderDueSection() {
     var sec = el("dueSection");
@@ -2440,6 +1857,7 @@
     var due = getDueItems(today);
     sec.hidden = due.length === 0;
     el("dueCount").textContent = String(due.length);
+    setTxt("dueOldest", due.length ? rangeLabel(due[0]) : "");
     var list = el("dueList");
     list.innerHTML = "";
     due.forEach(function (d) {
@@ -2474,32 +1892,113 @@
     var a = weeklyAnalytics();
     var today = todayStr();
     var st = streakStats(today);
-    el("statWordsWeek").textContent = a.lessonsWeek ? String(a.wordsWeek) : "\u2014";
-    el("statLessonsWeek").textContent = a.lessonsWeek ? String(a.lessonsWeek) : "\u2014";
-    el("statAccuracyWeek").textContent = a.accuracy === null ? "\u2014" : a.accuracy + "%";
-    el("statDueCount").textContent = String(a.dueCount);
-    el("statsNote").textContent = a.lessonsWeek
+    setTxt("statWordsWeek", a.lessonsWeek ? String(a.wordsWeek) : "\u2014");
+    setTxt("statLessonsWeek", a.lessonsWeek ? String(a.lessonsWeek) : "\u2014");
+    setTxt("statAccuracyWeek", a.accuracy === null ? "\u2014" : a.accuracy + "%");
+    setTxt("statDueCount", String(a.dueCount));
+    setTxt("statsNote", a.lessonsWeek
       ? "Last 7 days \u00B7 Streak: " + st.current + " day" + (st.current === 1 ? "" : "s") +
         " (best " + st.best + ") \u00B7 Next review: " +
         (a.dueCount ? a.dueCount + " due now" :
           a.nextDue ? fmtShortDate(a.nextDue) : "nothing scheduled") + "."
-      : "No lessons yet this week — your numbers will show here.";
+      : "Nothing yet \u2014 finish a lesson and your week shows here.");
     // XP + level.
     var lv = levelFor(xpTotal());
-    el("xpTotal").textContent = lv.xp.toLocaleString("en-US") + " XP";
-    el("xpLevel").textContent = lv.name;
-    el("xpBarFill").style.width = Math.round(lv.progress * 100) + "%";
-    el("xpNext").textContent = lv.next
+    setTxt("xpTotal", lv.xp.toLocaleString("en-US") + " XP");
+    setTxt("xpLevel", lv.name);
+    setFill("xpBarFill", lv.progress * 100);
+    setTxt("xpNext", lv.next
       ? lv.xpToNext.toLocaleString("en-US") + " XP to " + lv.next.name
-      : "Qari — the highest level";
-    // Daily quest.
+      : "Qari \u2014 the highest level");
+    // Daily quest (ring + title + sub, spec §4.2 / §9.2).
     var q = questStatus(today);
-    el("questText").textContent = q.done ? "Quest done \u2713" : "Finish 30 verses or 1 juz";
-    el("questBarFill").style.width = Math.min(100, Math.round(q.verses / q.target * 100)) + "%";
-    el("questProgress").textContent = q.juzDone
+    setTxt("questTitle", q.done ? "Quest done \u2713" : "30 verses or 1 juz");
+    setTxt("questSub", q.done ? "30 verses. See you tomorrow."
+      : "Verses = ayahs covered by lessons you finish today.");
+    setTxt("questText", q.juzDone ? "1 juz finished today" : q.verses + " verses today");
+    setFill("questBarFill", Math.min(100, q.verses / q.target * 100));
+    setTxt("questProgress", q.juzDone
       ? "1 juz finished today"
-      : q.verses + " / " + q.target + " verses today";
+      : q.verses + " / " + q.target + " verses today");
+    setRing("questRingFill", "questRingNum", Math.min(q.verses, q.target), q.target);
+    // Spec §4.2: the ring's number is the fraction ("12 / 30"), not the count.
+    setTxt("questRingNum", q.verses + " / " + q.target);
+    var qc = el("questCard");
+    if (qc) { qc.classList.toggle("is-done", q.done); }
+    renderWeekChart();
+    renderParentView();
   }
+
+  /* v5: 7-day analytics bar chart — one bar per day, height = words
+     heard that day, from real lessons only. Empty days are empty bars. */
+  function renderWeekChart() {
+    var chart = el("weekChart");
+    if (!chart || !quranData) { return; }
+    var today = todayStr();
+    var perDay = {};
+    lessonLog.forEach(function (e) { perDay[e.date] = (perDay[e.date] || 0) + e.heard; });
+    var days = [];
+    for (var i = 6; i >= 0; i--) { days.push(addDaysStr(today, -i)); }
+    var max = 0;
+    days.forEach(function (d) { if ((perDay[d] || 0) > max) { max = perDay[d]; } });
+    var letters = ["S", "M", "T", "W", "T", "F", "S"];
+    var html = "";
+    days.forEach(function (d, k) {
+      var v = perDay[d] || 0;
+      var h = max ? Math.max(v ? 8 : 2, Math.round(v / max * 72)) : 2;
+      html += '<span class="week-bar-col"><span class="week-bar' + (v ? "" : " is-empty") + '" style="height:' + h + 'px" title="' +
+        fmtShortDate(d) + ": " + v + ' words"></span><span class="week-bar-label">' +
+        letters[parseLocalDate(d).getDay()] + "</span></span>";
+    });
+    chart.innerHTML = html;
+  }
+
+  /* v5 parent view (spec §7.5): this device's real practice only. Every
+     sentence is built from real data; a sentence with no data behind it
+     is omitted, never faked. */
+  function renderParentView() {
+    var body = el("parentBody");
+    if (!body) { return; }
+    var today = todayStr();
+    var weekStart = addDaysStr(today, -6);
+    var daysSet = {}, newAyahs = 0, heard = 0, total = 0, workingOn = null;
+    lessonLog.forEach(function (e) {
+      if (e.date >= weekStart && e.date <= today) {
+        daysSet[e.date] = true;
+        newAyahs += (e.to - e.from + 1);
+        heard += e.heard;
+        total += e.total;
+        if (!workingOn) {
+          var sr = getSurah(e.surah);
+          workingOn = sr ? sr.englishName : null;
+        }
+      }
+    });
+    var days = Object.keys(daysSet).length;
+    var st = streakStats(today);
+    var due = getDueItems(today);
+    var nextDue = getNextDueDate(today);
+    var parts = [];
+    if (days > 0) {
+      parts.push("This week: " + days + " day" + (days === 1 ? "" : "s") + ", " +
+        newAyahs + " new ayah" + (newAyahs === 1 ? "" : "s") +
+        (total > 0 ? ", " + Math.round(heard / total * 100) + "% heard" : "") + ".");
+    }
+    if (st.current > 0) { parts.push("Streak: " + st.current + " day" + (st.current === 1 ? "" : "s") + "."); }
+    if (workingOn) { parts.push("Working on: " + workingOn + "."); }
+    if (due.length) {
+      var d0 = due[0];
+      var sr0 = getSurah(d0.surah);
+      parts.push("Due next: " + (sr0 ? sr0.englishName : "") + " review " +
+        (d0.due === today ? "today" : d0.due === addDaysStr(today, 1) ? "tomorrow" : fmtShortDate(d0.due)) + ".");
+    } else if (nextDue) {
+      parts.push("Due next: review " + (nextDue === addDaysStr(today, 1) ? "tomorrow" : fmtShortDate(nextDue)) + ".");
+    }
+    body.textContent = parts.length
+      ? parts.join(" ")
+      : "No practice yet \u2014 nothing to show. When someone recites on this device, their week shows up here.";
+  }
+
   function renderBadges() {
     var grid = el("badgeGrid");
     if (!grid) { return; }
@@ -2671,20 +2170,6 @@
              juz: juz };
   }
 
-  function openPlan(plan) {
-    planKind = plan;
-    saveCapPrefs();
-    lessonPickerInit = false; // new plan, new picker defaults
-    var line = el("lessonPlanLine");
-    if (line) { line.textContent = "Your plan: " + PLAN_LABELS[plan]; }
-    el("lessonJuzField").hidden = plan !== "juz";
-    el("lessonSurahField").hidden = plan === "juz" || plan === "review";
-    el("lessonFrom").disabled = plan === "ayah" || plan === "review";
-    el("lessonTo").disabled = plan === "ayah" || plan === "review";
-    renderLesson();
-    showScreen("lesson");
-  }
-
   function lessonDefaults() {
     // Suggested Sabaq start: resume point if it fits this plan, else the
     // plan's fresh start (Al-Fatiha for surah/ayah, Juz 30 for juz) at the
@@ -2705,6 +2190,70 @@
 
   var lessonPickerInit = false; // picker inputs take defaults once per plan
 
+  /* v5: set the Sabaq picker (the "Choose" sheet writes through here,
+     and placement applies its start through here). */
+  function setLessonPicker(surahNum, from, to) {
+    var surah = getSurah(surahNum);
+    if (!surah) { return false; }
+    var surahSel = el("lessonSurahSelect");
+    if (surahSel) { surahSel.value = String(surahNum); }
+    el("lessonFrom").value = from;
+    el("lessonTo").value = Math.min(to, surah.ayahs.length);
+    lessonPickerInit = true;
+    renderLesson();
+    return true;
+  }
+
+  /* v5: time stepper — 30 / 45 / 60 / 90 / 120 minutes. */
+  function cycleTime(dir) {
+    var steps = [30, 45, 60, 90, 120];
+    var i = steps.indexOf(state.minutes);
+    if (i < 0) { i = 1; }
+    i = Math.max(0, Math.min(steps.length - 1, i + dir));
+    state.minutes = steps[i];
+    saveState();
+    updateSplit();
+    renderLesson();
+  }
+
+  /* Is this tier's range already finished today (Hifz rule: only a
+     finished lesson counts)? Drives the "Done" state on the tier card. */
+  function tierDoneToday(r) {
+    if (!r) { return false; }
+    var today = todayStr();
+    for (var i = 0; i < lessonLog.length; i++) {
+      var e = lessonLog[i];
+      if (e.date === today && e.surah === r.surah && e.from === r.from && e.to === r.to) { return true; }
+    }
+    return false;
+  }
+  function tierRingFor(r, fillId, numId) {
+    if (!r) { setRing(fillId, numId, 0, 1); return; }
+    var heard = 0, total = 0;
+    for (var i = 0; i < lessonLog.length; i++) {
+      var e = lessonLog[i];
+      if (e.surah === r.surah && e.from === r.from && e.to === r.to) {
+        heard = e.heard; total = e.total; break;
+      }
+    }
+    setRing(fillId, numId, heard, total || 1);
+  }
+  function markTierDone(cardId, btnId, done) {
+    var card = el(cardId), btn = el(btnId);
+    if (card) { card.classList.toggle("is-done", !!done); }
+    if (btn) {
+      btn.disabled = !!done;
+      btn.textContent = done ? "Done \u2713"
+        : (btnId === "tierSabaqStart" ? "Start Sabaq \u2192"
+          : btnId === "tierSabqiStart" ? "Start Sabqi \u2192" : "Start Manzil \u2192");
+    }
+  }
+
+  /* v5 Today (spec §4): header + quest + due strip + beginner card +
+     three tier cards + compact settings row. */
+  function renderToday() {
+    renderLesson();
+  }
   function renderLesson() {
     if (!quranData) { return; }
     var d = lessonDefaults();
@@ -2740,61 +2289,102 @@
     });
     var note = el("lessonLevelNote");
     if (note) { note.textContent = LESSON_LEVELS[lessonLevel].note; }
+    updateSplit();
 
     // The three tiers, every day: Sabaq (new) + Sabqi (recent) + Manzil (old).
+    var split = SPLITS[state.minutes];
     var sb = sabaqRange();
     var sq = sabqiRange();
     var mz = manzilRange();
     if (sb) {
+      var nAy = sb.to - sb.from + 1;
       el("tierSabaqTitle").textContent = rangeLabel(sb);
-      el("tierSabaqSub").textContent = (sb.to - sb.from + 1) + " ayah" +
-        (sb.to > sb.from ? "s" : "") + " · " + rangeWordCount(sb.surah, sb.from, sb.to) + " words";
-      el("tierSabaqStart").disabled = false;
+      el("tierSabaqSub").textContent = nAy + " new ayah" + (nAy > 1 ? "s" : "") + " · " + split[0] + " min";
+      tierRingFor(sb, "tierRingSabaqFill", "tierRingSabaqNum");
+      el("tierSabaqStart").hidden = false;
+      markTierDone("tierSabaq", "tierSabaqStart", tierDoneToday(sb));
     }
     if (sq) {
+      var nSq = sq.to - sq.from + 1;
       el("tierSabqiTitle").textContent = rangeLabel(sq);
-      el("tierSabqiSub").textContent = (sq.to - sq.from + 1) + " ayah" +
-        (sq.to > sq.from ? "s" : "") + " · " + rangeWordCount(sq.surah, sq.from, sq.to) + " words";
-      el("tierSabqiStart").disabled = false;
+      var recent = completedLessons[0];
+      var yesterday = addDaysStr(todayStr(), -1);
+      var isYesterday = false;
+      lessonLog.forEach(function (e) {
+        if (e.date === yesterday && e.surah === sq.surah && e.from === sq.from && e.to === sq.to) { isYesterday = true; }
+      });
+      el("tierSabqiSub").textContent = isYesterday
+        ? "Yesterday's lesson · " + split[1] + " min"
+        : nSq + " ayah" + (nSq > 1 ? "s" : "") + " · " + split[1] + " min";
+      tierRingFor(sq, "tierRingSabqiFill", "tierRingSabqiNum");
+      el("tierSabqiStart").hidden = false;
+      markTierDone("tierSabqi", "tierSabqiStart", tierDoneToday(sq));
     } else {
       el("tierSabqiTitle").textContent = "No recent lesson yet";
       el("tierSabqiSub").textContent = "Finish your first lesson — your revision will show here.";
+      setRing("tierRingSabqiFill", "tierRingSabqiNum", 0, 1);
+      markTierDone("tierSabqi", "tierSabqiStart", false);
       el("tierSabqiStart").disabled = true;
+      el("tierSabqiStart").hidden = true;
     }
     if (mz) {
+      var nMz = mz.to - mz.from + 1;
       if (mz.due) {
-        el("tierManzilTitle").textContent = "Due for review · " + rangeLabel(mz);
+        el("tierManzilTitle").textContent = rangeLabel(mz);
         var overdueDays = daysBetween(mz.dueDate, todayStr());
         el("tierManzilSub").textContent = (overdueDays === 0 ? "Due today" : overdueDays === 1 ? "Overdue by 1 day" : "Overdue by " + overdueDays + " days") +
-          " · " + (mz.to - mz.from + 1) + " ayah" + (mz.to > mz.from ? "s" : "") + " · " +
-          rangeWordCount(mz.surah, mz.from, mz.to) + " words";
+          " · " + split[2] + " min";
       } else {
         el("tierManzilTitle").textContent = "Juz " + mz.juz + " · " + rangeLabel(mz);
-        el("tierManzilSub").textContent = (mz.to - mz.from + 1) + " ayah" +
-          (mz.to > mz.from ? "s" : "") + " · " + rangeWordCount(mz.surah, mz.from, mz.to) + " words";
+        el("tierManzilSub").textContent = nMz + " ayah" + (nMz > 1 ? "s" : "") + " · " + split[2] + " min";
       }
-      el("tierManzilStart").disabled = false;
+      tierRingFor(mz, "tierRingManzilFill", "tierRingManzilNum");
+      el("tierManzilStart").hidden = false;
+      markTierDone("tierManzil", "tierManzilStart", tierDoneToday(mz));
     } else {
       el("tierManzilTitle").textContent = "No older revision yet";
       el("tierManzilSub").textContent = "Once you finish lessons in another juz, it will rotate here.";
+      setRing("tierRingManzilFill", "tierRingManzilNum", 0, 1);
+      markTierDone("tierManzil", "tierManzilStart", false);
       el("tierManzilStart").disabled = true;
+      el("tierManzilStart").hidden = true;
     }
-    var resumeBtn = el("lessonResumeBtn");
-    if (resumeBtn) { resumeBtn.hidden = !lastPosition; }
     var rnote = el("lessonNote");
-    if (planKind === "review") {
-      var open = liveMistakes.filter(function (m) { return m.status === "open"; }).length;
-      if (rnote) {
-        rnote.hidden = false;
-        rnote.textContent = open
-          ? open + " word" + (open === 1 ? "" : "s") + " to fix — we will start at the first one."
-          : "No open mistakes yet — recite a lesson first, then come back here.";
-      }
-    } else if (rnote) { rnote.hidden = true; }
-    // v4c: due list, weekly numbers, badges — all from real history.
+    if (rnote) { rnote.hidden = true; }
+    renderBeginnerCard();
+    renderStreakCard();
     renderDueSection();
     renderAnalytics();
+  }
+
+  /* v5 Progress (spec §7): journey map + XP + badges + analytics +
+     parent view + words to fix. */
+  function renderProgress() {
+    if (!quranData) { return; }
+    buildJuzGrid();
+    renderAnalytics();
     renderBadges();
+    renderLiveHistory();
+    var pf = el("pathFinishedLine");
+    if (pf) { pf.hidden = !(beginnerState && beginnerState.graduated); }
+  }
+
+  /* v5 beginner card on Today (spec §4.6) — only for placed beginners. */
+  function renderBeginnerCard() {
+    var card = el("beginnerCard");
+    if (!card) { return; }
+    var show = placement && placement.track === "beginner" &&
+      beginnerState && !beginnerState.graduated && quranData;
+    card.hidden = !show;
+    if (!show) { return; }
+    var st = BEGINNER_STAGES[beginnerState.currentStage - 1];
+    if (!st) { card.hidden = true; return; }
+    var surah = getSurah(st.surah);
+    el("beginnerCardTitle").textContent = "Stage " + st.n + " · " + st.name;
+    var nAy = st.to - st.from + 1;
+    el("beginnerCardSub").textContent = "Practice: " + (surah ? surah.englishName : "") +
+      " " + st.from + "–" + st.to + " · " + nAy + " ayah" + (nAy > 1 ? "s" : "");
+    el("beginnerCardBtn").textContent = "Continue Stage " + st.n + " →";
   }
 
   function startLesson(tier) {
@@ -3102,15 +2692,15 @@
     renderLiveAyah();
   }
 
+  /* v5: "Words to fix" lives on the recap and on Progress (spec §2.3),
+     not on the lesson stage. Renders into both lists from the same
+     liveMistakes store. */
   function renderLiveHistory() {
-    var box = el("liveHistory");
-    var note = el("liveHistoryNote");
-    if (!box) { return; }
-    if (!liveMistakes.length) { box.innerHTML = ""; if (note) { note.hidden = false; } return; }
-    if (note) { note.hidden = true; }
     var html = "";
+    var openCount = 0;
     liveMistakes.forEach(function (m) {
-      var statusText = m.status === "open" ? "Needs work" : (m.status === "fixed" ? "Fixed ✓" : "Dismissed");
+      if (m.status === "open") { openCount++; }
+      var statusText = m.status === "open" ? "Needs work" : (m.status === "fixed" ? "Fixed \u2713" : "Dismissed");
       html += '<button class="live-mistake' + (m.status === "fixed" ? " is-fixed" : "") +
         (m.status === "dismissed" ? " is-dismissed" : "") + '" type="button" data-mistake="' + m.id + '">' +
         '<span class="live-mistake-ref">' + m.ref + '</span>' +
@@ -3119,23 +2709,31 @@
         '<span class="live-mistake-x" data-dismiss="' + m.id + '" aria-label="Dismiss">✕</span>' +
         "</button>";
     });
-    box.innerHTML = html;
-    forEach(box.querySelectorAll("[data-mistake]"), function (b) {
-      b.addEventListener("click", function (ev) {
-        var dis = ev.target && ev.target.getAttribute ? ev.target.getAttribute("data-dismiss") : null;
-        if (dis) { ev.stopPropagation(); dismissLiveMistake(dis); return; }
-        var m = findLiveMistake(b.getAttribute("data-mistake"));
-        if (!m) { return; }
-        // Jump to that ayah and open its correction sheet.
-        if (live && live.surah === m.surah) {
-          var idx = -1;
-          live.ayahs.forEach(function (a, k) { if (a.numberInSurah === m.ayah) { idx = k; } });
-          if (idx >= 0) { liveGoTo(idx); openLiveSheet(m.wordIndex); return; }
-        }
-        openLive(m.surah, m.ayah, m.ayah);
-        openLiveSheet(m.wordIndex);
+    // The recap list is owned by showRecap (this lesson's still-open
+    // words only); the full history lives on Progress alone.
+    [["progressFixList", "progressFixNone"]].forEach(function (pair) {
+      var box = el(pair[0]), note = el(pair[1]);
+      if (!box) { return; }
+      box.innerHTML = html;
+      if (note) { note.hidden = liveMistakes.length !== 0; }
+      forEach(box.querySelectorAll("[data-mistake]"), function (b) {
+        b.addEventListener("click", function (ev) {
+          var dis = ev.target && ev.target.getAttribute ? ev.target.getAttribute("data-dismiss") : null;
+          if (dis) { ev.stopPropagation(); dismissLiveMistake(dis); return; }
+          var m = findLiveMistake(b.getAttribute("data-mistake"));
+          if (!m) { return; }
+          if (live && live.surah === m.surah) {
+            var idx = -1;
+            live.ayahs.forEach(function (a, k) { if (a.numberInSurah === m.ayah) { idx = k; } });
+            if (idx >= 0) { hideRecap(); liveGoTo(idx); openLiveSheet(m.wordIndex); return; }
+          }
+          openLive(m.surah, m.ayah, m.ayah);
+          openLiveSheet(m.wordIndex);
+        });
       });
     });
+    var note = el("liveHistoryNote");
+    if (note) { note.hidden = liveMistakes.length !== 0; }
   }
 
   /* ---------- Rendering ---------- */
@@ -3268,6 +2866,7 @@
     stopLiveListening();
     liveDonePending = false;
     live.idx = idx;
+    hideRecap();
     el("liveSummary").hidden = true;
     el("liveSummaryNextBtn").hidden = false;
     el("liveHeardLine").hidden = true;
@@ -3305,18 +2904,26 @@
     });
     if (!ayahs.length) { return false; }
     live = { surah: surahNum, from: from, to: to, ayahs: ayahs, idx: 0, words: [],
-             tier: (opts && opts.tier) || null };
+             tier: (opts && opts.tier) || null,
+             returnTo: (opts && opts.returnTo) || "today",
+             beginnerStage: (opts && opts.beginnerStage) || null,
+             chain: (opts && opts.chain) || null,
+             chainIdx: (opts && typeof opts.chainIdx === "number") ? opts.chainIdx : 0,
+             lessonStartTs: Date.now() };
     // v4c: per-ayah heard/total for the lesson grade, plus the
     // once-only guards for lesson / diagnostic completion.
     live.lessonStats = { perAyah: {} };
     live.lessonRecorded = false;
     live.diagRecorded = false;
+    live.chainStats = live.chain ? { heard: 0, total: 0 } : null;
     liveResetTake();
+    hideRecap();
     el("liveSummary").hidden = true;
     el("liveHeardLine").hidden = true;
     el("liveInterimLine").hidden = true;
     el("liveStatus").textContent = "";
     el("liveStatus").classList.remove("practice-error");
+    syncQiraatToggle();
     setLiveEarLine(null);
     renderLiveHistory();
     showScreen("live");
@@ -3586,6 +3193,177 @@
 
   /* ---------- Navigation + Done ---------- */
 
+  /* v5 recap (spec §5.2): replaces the stage when the lesson ends. */
+  var DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  function fmtDueDate(dateStr) {
+    var d = parseLocalDate(dateStr);
+    return DAYS_SHORT[d.getDay()] + ", " + MONTHS_SHORT[d.getMonth()] + " " + d.getDate();
+  }
+  function hideRecap() {
+    var c = el("recapCard");
+    if (c) { c.hidden = true; }
+    var scr = el("screen-live");
+    if (scr) { scr.classList.remove("show-recap"); }
+  }
+  function countUpXp(elm, finalNum) {
+    // Counts 0 -> final over ~600ms (§1.5); the final text is set at the
+    // end (and immediately as a fallback if animation is unavailable).
+    if (!elm) { return; }
+    elm.textContent = "+" + finalNum + " XP";
+    if (!window.requestAnimationFrame) { return; }
+    var start = null;
+    function step(ts) {
+      if (start === null) { start = ts; }
+      var k = Math.min(1, (ts - start) / 600);
+      elm.textContent = "+" + Math.round(finalNum * k) + " XP";
+      if (k < 1) { window.requestAnimationFrame(step); }
+    }
+    window.requestAnimationFrame(step);
+  }
+  function showRecap(data) {
+    // data: {title, xp, xpExtra[], wordsHeard, wordsTotal, fixed,
+    //        dismissed, openMistakes[], streak, dueStr, diag}
+    var scr = el("screen-live");
+    if (scr) { scr.classList.add("show-recap"); }
+    el("recapTitle").textContent = data.title;
+    var noteEl = el("recapNote");
+    if (noteEl) {
+      noteEl.hidden = !data.note;
+      noteEl.textContent = data.note || "";
+    }
+    countUpXp(el("recapXp"), data.xp || 0);
+    var extra = el("recapXpExtra");
+    if (extra) {
+      if (data.xpExtra && data.xpExtra.length) {
+        extra.hidden = false;
+        extra.textContent = data.xpExtra.join(" · ");
+      } else { extra.hidden = true; extra.textContent = ""; }
+    }
+    el("recapWords").textContent = "Heard " + data.wordsHeard + " of " + data.wordsTotal + " words";
+    el("recapMistakes").textContent = data.fixed + " fixed · " + data.dismissed + " dismissed";
+    var list = el("recapFixList");
+    var none = el("recapFixNone");
+    if (data.openMistakes && data.openMistakes.length) {
+      var html = "";
+      data.openMistakes.forEach(function (m) {
+        html += '<button class="live-mistake" type="button" data-mistake="' + m.id + '">' +
+          '<span class="live-mistake-ref">' + m.ref + '</span>' +
+          '<span class="live-mistake-words"><strong>' + m.correct + '</strong> — you said <em>' + (m.heard || "—") + '</em></span>' +
+          "</button>";
+      });
+      list.innerHTML = html;
+      if (none) { none.hidden = true; }
+      forEach(list.querySelectorAll("[data-mistake]"), function (b) {
+        b.addEventListener("click", function () {
+          var m = findLiveMistake(b.getAttribute("data-mistake"));
+          if (!m) { return; }
+          hideRecap();
+          if (live && live.surah === m.surah) {
+            var idx = -1;
+            live.ayahs.forEach(function (a, k) { if (a.numberInSurah === m.ayah) { idx = k; } });
+            if (idx >= 0) { liveGoTo(idx); openLiveSheet(m.wordIndex); return; }
+          }
+          openLive(m.surah, m.ayah, m.ayah);
+          openLiveSheet(m.wordIndex);
+        });
+      });
+    } else {
+      list.innerHTML = "";
+      if (none) { none.hidden = false; }
+    }
+    el("recapStreak").textContent = "\uD83D\uDD25 " + data.streak + " day" + (data.streak === 1 ? "" : "s");
+    // A diagnostic banks nothing, so there is no next review to show.
+    var dueEl = el("recapDue");
+    if (dueEl) {
+      dueEl.hidden = !!data.diag;
+      if (!data.diag) { dueEl.textContent = "Next review: " + data.dueStr; }
+    }
+    // A diagnostic's report replaces the fix list: showing "No words to
+    // fix." above a report that says "Skipped: 1" contradicts itself.
+    if (data.diag) {
+      var fixTitle = el("recapFixTitle");
+      if (fixTitle) { fixTitle.hidden = true; }
+      if (list) { list.hidden = true; }
+      if (none) { none.hidden = true; }
+    }
+    var diag = el("recapDiagReport");
+    if (diag) {
+      if (data.diag) {
+        diag.hidden = false;
+        // The recap title already says "Your report" — no second heading.
+        var dt = el("recapDiagTitle");
+        if (dt) { dt.hidden = true; }
+        el("recapDiagLine").textContent = data.diag;
+      } else { diag.hidden = true; }
+    }
+    var card = el("recapCard");
+    if (card) { card.hidden = false; card.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    renderLiveHistory();
+  }
+  function lessonMistakeCounts() {
+    var fixed = 0, dismissed = 0, open = [];
+    var since = live ? live.lessonStartTs : 0;
+    liveMistakes.forEach(function (m) {
+      if ((m.ts || 0) < since) { return; }
+      if (m.status === "fixed") { fixed++; }
+      else if (m.status === "dismissed") { dismissed++; }
+      else if (m.status === "open") { open.push(m); }
+    });
+    return { fixed: fixed, dismissed: dismissed, open: open };
+  }
+  function closeLive() {
+    stopLiveListening();
+    hideRecap();
+    var dest = (live && live.returnTo === "read") ? "read" : "today";
+    showScreen(dest);
+  }
+  function nextLessonAfterRecap() {
+    if (!live) { showScreen("today"); return; }
+    // Beginner chain: next range of the same stage.
+    if (live.chain && live.chainIdx < live.chain.ranges.length - 1) {
+      var nxt = live.chain.ranges[live.chainIdx + 1];
+      var prevStats = live.chainStats || { heard: 0, total: 0 };
+      var ok = openLive(nxt.surah, nxt.from, nxt.to,
+        { tier: "beginner", beginnerStage: live.beginnerStage,
+          chain: live.chain, chainIdx: live.chainIdx + 1 });
+      if (ok && live) { live.chainStats = prevStats; }
+      return;
+    }
+    // Beginner stage: next stage (or retry this one if not passed).
+    if (live.beginnerStage) {
+      var st = beginnerState;
+      var next = st && st.passed.indexOf(live.beginnerStage) >= 0
+        ? live.beginnerStage + 1 : live.beginnerStage;
+      // Stage 29 is Graduation, not a lesson: finishing the path goes
+      // to the beginner screen, where the graduation card shows.
+      if (next >= 29) { showScreen("beginner"); return; }
+      startBeginnerStage(next);
+      return;
+    }
+    if (liveDiag) { showScreen("today"); return; }
+    // Next tier not done today, else the next Sabaq range.
+    var tiers = ["sabaq", "sabqi", "manzil"];
+    for (var i = 0; i < tiers.length; i++) {
+      var r = tiers[i] === "sabqi" ? sabqiRange() : tiers[i] === "manzil" ? manzilRange() : sabaqRange();
+      if (r && !(r.surah === live.surah && r.from === live.from && r.to === live.to) && !tierDoneToday(r)) {
+        startLesson(tiers[i]);
+        return;
+      }
+    }
+    var surah = getSurah(live.surah);
+    var nextFrom = live.to + 1;
+    if (surah && nextFrom <= surah.ayahs.length) {
+      openLive(live.surah, nextFrom, Math.min(nextFrom + LESSON_LEVELS[lessonLevel].ayahs - 1, surah.ayahs.length), { tier: "sabaq" });
+      return;
+    }
+    var nextSurah = getSurah(live.surah + 1);
+    if (nextSurah) {
+      openLive(nextSurah.number, 1, Math.min(LESSON_LEVELS[lessonLevel].ayahs, nextSurah.ayahs.length), { tier: "sabaq" });
+      return;
+    }
+    showScreen("today");
+  }
+
   function liveNext() {
     if (!live) { return; }
     if (liveHold && liveHasOpenMistakes()) {
@@ -3642,21 +3420,8 @@
     var result = scoreRecitation(words, heardWords);
     var open = live.words.filter(function (w) { return w.state === "bad"; }).length;
     var heard = liveScore();
-    if (liveDiag && isLast) {
-      // End of the diagnostic run: the report, not the per-ayah summary.
-      tallyLiveAyah();
-      recordDiagnosticCompletion();
-      var rep = diagReportText();
-      var surah = getSurah(live.surah);
-      el("liveSummaryTitle").textContent = rep.title + " — " + (surah ? surah.englishName : "");
-      el("liveSummaryLine").textContent = rep.line;
-      el("liveDiagReportTitle").textContent = "Mistakes: " + rep.pct + "%";
-      el("liveDiagReportLine").textContent = rep.mistakes + " of " + rep.total + " words · " +
-        "Wrong word: " + liveDiagStats.substituted + " · Skipped: " + liveDiagStats.skipped +
-        " · Extra: " + liveDiagStats.extra;
-      el("liveDiagReport").hidden = false;
-      el("liveSummaryNextBtn").hidden = true;
-    } else {
+    if (!isLast) {
+      // Per-ayah Done: the small summary under the stage (unchanged).
       var title = result.score === 100 ? "Beautiful — every word heard"
         : (result.score >= 80 ? "Good work!" : "Almost — a few words to fix");
       el("liveSummaryTitle").textContent = title;
@@ -3665,24 +3430,100 @@
         (result.extras.length ? " · Extra heard: " + result.extras.join(" ") : "");
       el("liveDiagReport").hidden = true;
       el("liveSummaryNextBtn").hidden = false;
+      el("liveSummary").hidden = false;
+      el("liveSummary").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
-    el("liveSummary").hidden = false;
-    el("liveSummary").scrollIntoView({ behavior: "smooth", block: "start" });
+    // Last ayah: the session ends — the recap replaces the stage (v5).
+    var st = streakStats(todayStr());
+    if (liveDiag) {
+      tallyLiveAyah();
+      recordDiagnosticCompletion();
+      var rep = diagReportText();
+      var diagLine = "Mistakes: " + rep.pct + "% · Substituted: " + liveDiagStats.substituted +
+        " · Skipped: " + liveDiagStats.skipped + " · Extra: " + liveDiagStats.extra +
+        " (" + rep.mistakes + " of " + rep.total + " words)";
+      var diagAcc = liveDiagStats.total ? Math.round(liveDiagStats.heard / liveDiagStats.total * 100) : 0;
+      // Beginner stage 28 is a diagnostic: pass at >=80% words heard.
+      if (live.beginnerStage === 28 && diagAcc >= 80) { passBeginnerStage(28); }
+      showRecap({
+        title: "Your report", xp: 0, xpExtra: [],
+        wordsHeard: liveDiagStats.heard, wordsTotal: liveDiagStats.total,
+        fixed: 0, dismissed: 0, openMistakes: [],
+        streak: st.current, dueStr: "this was a test — nothing banked",
+        diag: diagLine + " · " + placementBandFor(diagAcc).label,
+        note: (live.beginnerStage === 28 && diagAcc < 80) ? "Not yet — listen again and try." : null
+      });
+      return;
+    }
     // Finishing the last ayah of a lesson completes the lesson — the
-    // Sabqi / Manzil tiers read this. A diagnostic is a test, not a
-    // lesson, so it is never recorded. Hifz rule (QuranCast's, and
-    // ours): nothing counts until the session is finished — Done on
-    // the last ayah IS the finish, so a half-done lesson (closed or
-    // abandoned mid-range) banks nothing, and the guard below means a
-    // second Done tap can never bank the same lesson twice.
-    if (isLast && !liveDiag && !live.lessonRecorded) {
+    // Sabqi / Manzil tiers read this. Hifz rule: nothing counts until
+    // the session is finished — Done on the last ayah IS the finish, so
+    // a half-done lesson (closed or abandoned mid-range) banks nothing,
+    // and the guard below means a second Done tap can never bank the
+    // same lesson twice.
+    var xpBefore = xpTotal();
+    if (!live.lessonRecorded) {
       live.lessonRecorded = true;
       recordCompletedLesson(live.surah, live.from, live.to, lessonTotals());
     }
+    var xpAfter = xpTotal();
+    var xpExtra = [];
+    var today = todayStr();
+    progressTotals.xpSurahs.forEach(function (e) {
+      if (e.surah === live.surah && e.date === today) { xpExtra.push("+500 XP — surah finished"); }
+    });
+    var seenJuz = {};
+    for (var a = live.from; a <= live.to; a++) {
+      var jj = juzFor(live.surah, a);
+      if (!jj || seenJuz[jj]) { continue; }
+      seenJuz[jj] = true;
+      progressTotals.xpJuz.forEach(function (e) {
+        if (e.juz === jj && e.date === today) { xpExtra.push("+5,000 XP — juz finished"); }
+      });
+    }
+    var totals = lessonTotals();
+    var counts = lessonMistakeCounts();
+    var rec = sm2[sm2Key(live.surah, live.from, live.to)];
+    var dueStr = "tomorrow";
+    if (rec && rec.due) {
+      dueStr = rec.due === addDaysStr(today, 1) ? "tomorrow" : fmtDueDate(rec.due);
+    }
+    var pct = totals.total ? Math.round(totals.heard / totals.total * 100) : 0;
+    // Beginner stage: fold this range into the chain tally (if any) and
+    // evaluate the stage pass at the end of the stage.
+    var stageNote = null;
+    if (live.beginnerStage) {
+      if (live.chainStats) {
+        live.chainStats.heard += totals.heard;
+        live.chainStats.total += totals.total;
+      }
+      var isChainEnd = !live.chain || live.chainIdx >= live.chain.ranges.length - 1;
+      if (isChainEnd) {
+        var acc = live.chainStats
+          ? (live.chainStats.total ? Math.round(live.chainStats.heard / live.chainStats.total * 100) : 0)
+          : pct;
+        if (acc >= 70) { passBeginnerStage(live.beginnerStage); }
+        else { stageNote = "Not yet — listen again and try."; }
+      }
+    }
+    showRecap({
+      title: pct === 100 ? "Lesson done" : "Lesson done — keep going",
+      xp: xpAfter - xpBefore, xpExtra: xpExtra,
+      wordsHeard: totals.heard, wordsTotal: totals.total,
+      fixed: counts.fixed, dismissed: counts.dismissed, openMistakes: counts.open,
+      streak: streakStats(today).current, dueStr: dueStr, diag: null, note: stageNote
+    });
   }
 
   function liveTryAgain() {
     if (!live) { return; }
+    // Retry after a finished lesson (recap showing) is a fresh take:
+    // the lesson may bank again, exactly as re-opening the range would.
+    if (el("recapCard") && !el("recapCard").hidden) {
+      hideRecap();
+      live.lessonRecorded = false;
+    }
     // A word that was wrong gets a real second chance: said right in the
     // new take it shows as fixed, not just good.
     live.words.forEach(function (w) {
@@ -3736,6 +3577,15 @@
   }
 
   function liveSheetRetry() {
+    if (sheetContext === "placement") {
+      closeLiveSheet();
+      sheetContext = "live";
+      placementSheetWord = -1;
+      placementWords.forEach(function (w) { if (w.state !== "dismissed") { w.state = "pending"; } });
+      renderPlacementPassage();
+      togglePlacementMic();
+      return;
+    }
     if (!live || liveSheetWord < 0) { closeLiveSheet(); return; }
     var w = live.words[liveSheetWord];
     if (w) { w.state = "retry"; w.heard = ""; }
@@ -3747,6 +3597,22 @@
   }
 
   function liveSheetDismiss() {
+    if (sheetContext === "placement" && placementSheetWord >= 0) {
+      var pw = placementWords[placementSheetWord];
+      if (pw) { pw.state = "dismissed"; }
+      closeLiveSheet();
+      sheetContext = "live";
+      placementSheetWord = -1;
+      renderPlacementPassage();
+      var expected = placementExpectedWords();
+      var heardWords = placementHeardText.trim() ? placementHeardText.trim().split(/\s+/) : [];
+      var r = scoreRecitation(expected, heardWords);
+      var heard = 0;
+      placementWords.forEach(function (w) { if (w.state === "good" || w.state === "dismissed") { heard++; } });
+      var acc = placementWords.length ? Math.round(heard / placementWords.length * 100) : r.score;
+      showPlacementResult(acc);
+      return;
+    }
     if (!live || liveSheetWord < 0) { closeLiveSheet(); return; }
     var w = live.words[liveSheetWord];
     var stoppedHere = liveStoppedAt === liveSheetWord;
@@ -3777,54 +3643,465 @@
     if (live) { renderLiveAyah(); }
   }
 
+  /* ================= v5: placement front door (spec §3) ============
+     First run only: the app listens to Fatiha 1:1–1:4 (13 words) or,
+     on "Too hard", Ikhlas 112:1–4 (19 words), and places the student.
+     Same Groq ear, same 2.5 s slices, same LCS scoring, no prompt.
+     Bands: 90–100% -> memorization from An-Naba 78:1; 70–89% ->
+     memorization from Al-Ikhlas 112:1; 50–69% -> beginner Stage 8;
+     below 50% -> beginner Stage 1; "I can't read Arabic yet" ->
+     beginner Stage 1 with no score. Stored in sabaq-v5-placement. */
+  var placement = null; // {passage, accuracy, track, startSurah, startAyah, beginnerStage, date}
+  var placementWords = []; // [{text, state, heard}] for the current passage
+  var placementHeardText = "";
+  var placementListening = false;
+  var placementRecorder = null;
+  var placementStream = null;
+  var placementChunks = [];
+  var placementSending = false;
+  var placementTakeSeq = 0;
+  var placementTimer = null;
+  var sheetContext = "live"; // "live" | "placement" — which flow owns the correction sheet
+
+  function placementBandFor(acc) {
+    if (acc >= 90) { return { track: "memorization", startSurah: 78, startAyah: 1, beginnerStage: null, label: "Start with Juz 30" }; }
+    if (acc >= 70) { return { track: "memorization", startSurah: 112, startAyah: 1, beginnerStage: null, label: "Start with the short surahs" }; }
+    if (acc >= 50) { return { track: "beginner", startSurah: 106, startAyah: 1, beginnerStage: 8, label: "Start with simple sentences" }; }
+    return { track: "beginner", startSurah: 112, startAyah: 1, beginnerStage: 1, label: "Start from the beginning — the alphabet first" };
+  }
+  function placementPassageDef() {
+    return placement && placement.passage === "ikhlas"
+      ? { key: "ikhlas", name: "Ikhlas", surah: 112, from: 1, to: 4, ref: "Al-Ikhlas 112:1–4" }
+      : { key: "fatiha", name: "Fatiha", surah: 1, from: 1, to: 4, ref: "Al-Fatiha 1:1–1:4" };
+  }
+  function placementExpectedWords() {
+    var def = placementPassageDef();
+    var out = [];
+    for (var a = def.from; a <= def.to; a++) {
+      var surah = getSurah(def.surah);
+      var text = surah && surah.ayahs[a - 1] ? surah.ayahs[a - 1].text : "";
+      captionWordsForAyah(def.surah, a, text).forEach(function (w) { out.push(w.text); });
+    }
+    return out;
+  }
+  function savePlacement() {
+    try {
+      if (placement) { localStorage.setItem("sabaq-v5-placement", JSON.stringify(placement)); }
+      else { localStorage.removeItem("sabaq-v5-placement"); }
+    } catch (e) {}
+  }
+  function loadPlacement() {
+    try {
+      var raw = localStorage.getItem("sabaq-v5-placement");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && (saved.track === "memorization" || saved.track === "beginner")) { placement = saved; }
+    } catch (e) {}
+  }
+  function renderPlacementPassage() {
+    var box = el("placementPassage");
+    var ref = el("placementPassageRef");
+    if (!box) { return; }
+    var def = placementPassageDef();
+    if (ref) { ref.textContent = def.ref; }
+    var html = "";
+    placementWords.forEach(function (w, i) {
+      var cls = "placement-word";
+      if (w.state === "good") { cls += " is-good"; }
+      else if (w.state === "bad") { cls += " is-bad"; }
+      html += '<span class="' + cls + '" data-word="' + i + '" role="button" tabindex="0">' + escHtml(w.text) + "</span>";
+    });
+    box.innerHTML = html;
+    forEach(box.querySelectorAll("[data-word]"), function (sp) {
+      sp.addEventListener("click", function () {
+        var i = parseInt(sp.getAttribute("data-word"), 10);
+        if (placementWords[i] && placementWords[i].state === "bad") { openPlacementSheet(i); }
+      });
+    });
+  }
+  function openPlacement() {
+    if (!placement) { placement = { passage: "fatiha", accuracy: null, track: null, startSurah: null, startAyah: null, beginnerStage: null, date: null }; }
+    if (!placement.passage) { placement.passage = "fatiha"; }
+    placementWords = placementExpectedWords().map(function (t) {
+      return { text: t, state: "pending", heard: "" };
+    });
+    placementHeardText = "";
+    var res = el("placementResult");
+    if (res) { res.hidden = true; }
+    setTxt("placementStatus", "");
+    el("placementStatus").classList.remove("practice-error");
+    el("placementListeningLine").hidden = true;
+    setPlacementMicUI(false);
+    renderPlacementPassage();
+    showScreen("placement");
+  }
+  function setPlacementMicUI(listening) {
+    var b = el("placementMicBtn");
+    if (!b) { return; }
+    b.classList.toggle("is-listening", listening);
+    el("placementMicText").textContent = listening ? "Tap to stop" : "Tap and recite";
+    el("placementListeningLine").hidden = !listening;
+  }
+  function placementError(msg) {
+    var st = el("placementStatus");
+    st.textContent = msg;
+    st.classList.add("practice-error");
+  }
+  function applyPlacementTranscript(text) {
+    placementHeardText = text || "";
+    var expected = placementExpectedWords();
+    var heardWords = placementHeardText.trim() ? placementHeardText.trim().split(/\s+/) : [];
+    var r = scoreRecitation(expected, heardWords);
+    var matched = {};
+    r.matched.forEach(function (i) { matched[i] = true; });
+    placementWords.forEach(function (w, i) {
+      if (w.state === "dismissed") { return; }
+      w.state = matched[i] ? "good" : "bad";
+    });
+    renderPlacementPassage();
+    showPlacementResult(r.score);
+  }
+  function showPlacementResult(acc) {
+    var def = placementPassageDef();
+    var band = placementBandFor(acc);
+    placement.accuracy = acc;
+    placement.track = band.track;
+    placement.startSurah = band.startSurah;
+    placement.startAyah = band.startAyah;
+    placement.beginnerStage = band.beginnerStage;
+    placement.date = todayStr();
+    savePlacement();
+    var text;
+    if (acc >= 90) { text = "You read " + def.name + " at " + acc + "%. Start with Juz 30."; }
+    else if (acc >= 70) { text = "You read " + def.name + " at " + acc + "%. Start with the short surahs."; }
+    else if (acc >= 50) { text = "You read " + def.name + " at " + acc + "%. Start with simple sentences."; }
+    else { text = "Let's start from the beginning — the alphabet first."; }
+    el("placementResultText").textContent = text;
+    el("placementResult").hidden = false;
+    el("placementResult").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function placementNoRead() {
+    stopPlacementListening();
+    placement = { passage: "none", accuracy: null, track: "beginner",
+                  startSurah: 112, startAyah: 1, beginnerStage: 1, date: todayStr() };
+    savePlacement();
+    el("placementResultText").textContent = "No problem. We start with the alphabet.";
+    el("placementResult").hidden = false;
+  }
+  function applyPlacement() {
+    if (!placement) { return false; }
+    if (placement.track === "beginner") {
+      if (!beginnerState) { loadBeginner(); }
+      beginnerState.currentStage = placement.beginnerStage || 1;
+      beginnerState.graduated = false;
+      saveBeginner();
+      renderBeginnerCard();
+    } else if (placement.track === "memorization") {
+      setLessonPicker(placement.startSurah || 78, placement.startAyah || 1,
+        (placement.startAyah || 1) + LESSON_LEVELS[lessonLevel].ayahs - 1);
+    }
+    showScreen("today");
+    return true;
+  }
+  function stopPlacementListening() {
+    if (placementTimer) { clearTimeout(placementTimer); placementTimer = null; }
+    if (placementRecorder && placementRecorder.state !== "inactive") {
+      try { placementRecorder.stop(); } catch (e) {}
+    }
+    placementListening = false;
+    setPlacementMicUI(false);
+  }
+  function sendPlacementSlice(isFinal) {
+    if (!placementChunks.length) {
+      if (isFinal) { applyPlacementTranscript(""); }
+      return;
+    }
+    if (placementSending) { return; }
+    var seq = placementTakeSeq;
+    var type = (placementChunks[0] && placementChunks[0].type) || "audio/webm";
+    var blob = new Blob(placementChunks, { type: type });
+    placementChunks = [];
+    if (!blob.size) { if (isFinal) { applyPlacementTranscript(""); } return; }
+    placementSending = true;
+    var form = new FormData();
+    form.append("file", blob, "placement.webm");
+    form.append("language", "ar");
+    fetch(SABAQ_EAR_URL, { method: "POST", body: form }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (out) {
+      placementSending = false;
+      if (placementTakeSeq === seq) {
+        if (out.ok && out.data && typeof out.data.text === "string") {
+          applyPlacementTranscript(out.data.text);
+        } else {
+          placementError("The ear didn't answer. Try again — your place is saved.");
+        }
+      }
+    }).catch(function () {
+      placementSending = false;
+      placementError("Listening needs internet. You can still start — tap 'I can't read Arabic yet' and we will place you by hand later.");
+    });
+  }
+  function togglePlacementMic() {
+    if (placementListening) { stopPlacementListening(); return; }
+    if (!SABAQ_EAR_URL) {
+      placementError("Listening needs internet. You can still start — tap 'I can't read Arabic yet' and we will place you by hand later.");
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can't read Arabic yet' to skip.");
+      return;
+    }
+    el("placementStatus").classList.remove("practice-error");
+    el("placementStatus").textContent = "Getting the mic ready…";
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      var mime = "";
+      ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].forEach(function (m) {
+        if (!mime && window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) { mime = m; }
+      });
+      placementChunks = [];
+      placementStream = stream;
+      try {
+        placementRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      } catch (e) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        placementError("Recording could not start — tap the mic to try again.");
+        return;
+      }
+      placementRecorder.ondataavailable = function (ev) {
+        if (ev.data && ev.data.size) { placementChunks.push(ev.data); sendPlacementSlice(false); }
+      };
+      placementRecorder.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        sendPlacementSlice(true);
+      };
+      placementRecorder.start(2500);
+      placementTakeSeq++;
+      placementListening = true;
+      setPlacementMicUI(true);
+      placementTimer = setTimeout(function () { stopPlacementListening(); }, 30000);
+    }).catch(function () {
+      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can't read Arabic yet' to skip.");
+    });
+  }
+  /* Correction sheet, placement context: Retry re-takes the passage,
+     Dismiss marks the word heard and recomputes the result. */
+  var placementSheetWord = -1;
+  function openPlacementSheet(i) {
+    var w = placementWords[i];
+    if (!w) { return; }
+    sheetContext = "placement";
+    placementSheetWord = i;
+    liveSheetWord = -1;
+    el("liveSheetTitle").textContent = w.text;
+    el("liveSheetHeard").textContent = "You said: " + (w.heard ? w.heard : "—");
+    el("liveSheetCorrect").textContent = "Correct: " + w.text;
+    var info = el("liveSheetWordInfo");
+    if (info) { info.hidden = true; }
+    el("liveSheetDismiss").style.display = "";
+    el("liveSheet").hidden = false;
+  }
+
+  /* ================= v5: beginner path — 29 stages, 3 levels (spec §8)
+     Passages verified against data/quran.json (see BUILD-NOTE-v5.md):
+     no substitutions were needed. Stage 25's six disconnected-letter
+     ayahs and stage 9's two passages run as a chain of live ranges;
+     stage 28 is a diagnostic (pass at >=80%); all other stages pass
+     at >=70% words heard. */
+  var BEGINNER_STAGES = [
+    { n: 1, name: "Arabic Alphabet", level: 1, surah: 112, from: 1, to: 4 },
+    { n: 2, name: "Basic Sounds", level: 1, surah: 108, from: 1, to: 3 },
+    { n: 3, name: "Short Vowels", level: 1, surah: 103, from: 1, to: 3 },
+    { n: 4, name: "Long Vowels", level: 1, surah: 110, from: 1, to: 3 },
+    { n: 5, name: "Tanween", level: 1, surah: 105, from: 1, to: 5 },
+    { n: 6, name: "Sukoon", level: 1, surah: 94, from: 1, to: 8 },
+    { n: 7, name: "Shaddah", level: 1, surah: 93, from: 1, to: 11 },
+    { n: 8, name: "Basic Words", level: 1, surah: 106, from: 1, to: 4 },
+    { n: 9, name: "Simple Sentences", level: 1, surah: 103, from: 1, to: 3,
+      chain: [{ surah: 103, from: 1, to: 3 }, { surah: 108, from: 1, to: 3 }] },
+    { n: 10, name: "Isti'adha", level: 2, surah: 16, from: 98, to: 98 },
+    { n: 11, name: "Basmalah Rules", level: 2, surah: 1, from: 1, to: 1 },
+    { n: 12, name: "Madd Types", level: 2, surah: 95, from: 1, to: 8 },
+    { n: 13, name: "Noon / Meem Sakinah", level: 2, surah: 99, from: 1, to: 8 },
+    { n: 14, name: "Laam Rules", level: 2, surah: 91, from: 1, to: 15 },
+    { n: 15, name: "Stopping Rules", level: 2, surah: 94, from: 1, to: 8 },
+    { n: 16, name: "Waqf Symbols", level: 2, surah: 101, from: 1, to: 11 },
+    { n: 17, name: "Joining Verses", level: 2, surah: 102, from: 1, to: 8 },
+    { n: 18, name: "Revision Checkpoint", level: 2, surah: 111, from: 1, to: 5 },
+    { n: 19, name: "Qalqalah", level: 3, surah: 97, from: 1, to: 5 },
+    { n: 20, name: "Tafkheem", level: 3, surah: 85, from: 1, to: 22 },
+    { n: 21, name: "Tarqeeq", level: 3, surah: 96, from: 1, to: 19 },
+    { n: 22, name: "Ra Rules", level: 3, surah: 100, from: 1, to: 11 },
+    { n: 23, name: "Hamzah Types", level: 3, surah: 104, from: 1, to: 9 },
+    { n: 24, name: "Advanced Madd", level: 3, surah: 87, from: 1, to: 19 },
+    { n: 25, name: "Connected Letters", level: 3, surah: 2, from: 1, to: 1,
+      chain: [{ surah: 2, from: 1, to: 1 }, { surah: 3, from: 1, to: 1 },
+              { surah: 29, from: 1, to: 1 }, { surah: 30, from: 1, to: 1 },
+              { surah: 31, from: 1, to: 1 }, { surah: 32, from: 1, to: 1 }] },
+    { n: 26, name: "Full Surah Practice", level: 3, surah: 67, from: 1, to: 30 },
+    { n: 27, name: "Tajweed Mastery", level: 3, surah: 89, from: 1, to: 30 },
+    { n: 28, name: "Final Assessment", level: 3, surah: 67, from: 1, to: 30 },
+    { n: 29, name: "Graduation", level: 3, surah: null, from: null, to: null }
+  ];
+  var beginnerState = null; // {currentStage, passed[], attempts{}, graduated, graduationSeen}
+  function loadBeginner() {
+    beginnerState = { currentStage: 1, passed: [], attempts: {}, graduated: false, graduationSeen: false };
+    try {
+      var raw = localStorage.getItem("sabaq-v5-beginner");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") {
+        if (typeof saved.currentStage === "number" && saved.currentStage >= 1 && saved.currentStage <= 29) {
+          beginnerState.currentStage = saved.currentStage;
+        }
+        if (Array.isArray(saved.passed)) {
+          beginnerState.passed = saved.passed.filter(function (n) { return typeof n === "number" && n >= 1 && n <= 28; });
+        }
+        if (saved.attempts && typeof saved.attempts === "object") { beginnerState.attempts = saved.attempts; }
+        if (saved.graduated === true) { beginnerState.graduated = true; }
+        if (saved.graduationSeen === true) { beginnerState.graduationSeen = true; }
+      }
+    } catch (e) {}
+  }
+  function saveBeginner() {
+    try { localStorage.setItem("sabaq-v5-beginner", JSON.stringify(beginnerState)); } catch (e) {}
+  }
+  function stageUnlocked(n) {
+    if (n === 1) { return true; }
+    return beginnerState.passed.indexOf(n - 1) >= 0;
+  }
+  function stagePassageLabel(st) {
+    if (!st.surah) { return ""; }
+    var surah = getSurah(st.surah);
+    var nAy = st.to - st.from + 1;
+    return "Practice: " + (surah ? surah.englishName : "") + " " + st.from + "–" + st.to +
+      " · " + nAy + " ayah" + (nAy > 1 ? "s" : "");
+  }
+  function renderBeginnerPath() {
+    var box = el("beginnerLevels");
+    if (!box || !quranData) { return; }
+    if (!beginnerState) { loadBeginner(); }
+    var levels = ["Level 1 · Foundation", "Level 2 · Intermediate", "Level 3 · Advanced"];
+    var html = "";
+    levels.forEach(function (lname, li) {
+      html += '<h2 class="beginner-level-title">' + lname + "</h2>";
+      BEGINNER_STAGES.forEach(function (st) {
+        if (st.level !== li + 1) { return; }
+        var passed = beginnerState.passed.indexOf(st.n) >= 0;
+        var unlocked = st.n === 29 ? beginnerState.graduated : stageUnlocked(st.n);
+        var isCurrent = st.n === beginnerState.currentStage && !passed;
+        var cls = "stage-card" + (passed ? " is-passed" : "") + (isCurrent ? " is-current" : "") + (!unlocked ? " is-locked" : "");
+        html += '<div class="' + cls + '" data-stage="' + st.n + '">' +
+          '<p class="stage-kicker">Stage ' + st.n + '</p>' +
+          '<p class="stage-title">Stage ' + st.n + ' · ' + st.name + '</p>' +
+          '<p class="stage-sub">' + (st.n === 29 ? "You finished the path." : stagePassageLabel(st)) + '</p>';
+        if (st.n === 29) {
+          if (beginnerState.graduated && !beginnerState.graduationSeen) {
+            // The graduation card below carries the CTA — do not repeat it.
+            html += '<span class="stage-state">Passed ✓</span>';
+          } else {
+            html += '<button class="primary-btn stage-btn" type="button" data-stage-start="29"' + (beginnerState.graduated ? "" : " disabled") + '>Start memorizing →</button>';
+          }
+        } else if (passed) {
+          html += '<span class="stage-state">Passed ✓</span>' +
+            '<button class="ghost-btn stage-btn" type="button" data-stage-start="' + st.n + '">Review Stage ' + st.n + ' →</button>';
+        } else if (unlocked) {
+          html += '<button class="primary-btn stage-btn" type="button" data-stage-start="' + st.n + '">' +
+            (isCurrent ? "Continue Stage " + st.n + " →" : "Start Stage " + st.n + " →") + "</button>";
+        } else {
+          html += '<span class="stage-state">Finish Stage ' + (st.n - 1) + ' first</span>';
+        }
+        html += "</div>";
+      });
+    });
+    box.innerHTML = html;
+    forEach(box.querySelectorAll("[data-stage-start]"), function (b) {
+      b.addEventListener("click", function () {
+        var n = parseInt(b.getAttribute("data-stage-start"), 10);
+        if (n === 29) { applyGraduation(); return; }
+        startBeginnerStage(n);
+      });
+    });
+    var grad = el("graduationCard");
+    if (grad) { grad.hidden = !(beginnerState.graduated && !beginnerState.graduationSeen); }
+  }
+  function startBeginnerStage(n) {
+    var st = BEGINNER_STAGES[n - 1];
+    if (!st || !st.surah) { return false; }
+    if (!stageUnlocked(n)) { return false; }
+    if (!beginnerState) { loadBeginner(); }
+    beginnerState.attempts[n] = (beginnerState.attempts[n] || 0) + 1;
+    beginnerState.currentStage = n;
+    saveBeginner();
+    setCapMode("beginner");
+    if (n === 28) {
+      var ok = openLive(st.surah, st.from, st.to, { tier: "beginner", beginnerStage: 28, diagnostic: true });
+      if (ok) { setCapMode("diagnostic"); }
+      return ok;
+    }
+    if (st.chain) {
+      var first = st.chain[0];
+      return openLive(first.surah, first.from, first.to,
+        { tier: "beginner", beginnerStage: n, chain: { ranges: st.chain }, chainIdx: 0 });
+    }
+    return openLive(st.surah, st.from, st.to, { tier: "beginner", beginnerStage: n });
+  }
+  function passBeginnerStage(n) {
+    if (!beginnerState) { loadBeginner(); }
+    if (beginnerState.passed.indexOf(n) < 0) { beginnerState.passed.push(n); }
+    if (n === 28) {
+      beginnerState.graduated = true;
+      beginnerState.currentStage = 29;
+    } else if (beginnerState.currentStage <= n) {
+      beginnerState.currentStage = Math.min(n + 1, 29);
+    }
+    saveBeginner();
+    renderBeginnerPath();
+    renderBeginnerCard();
+  }
+  function applyGraduation() {
+    if (!beginnerState) { loadBeginner(); }
+    beginnerState.graduationSeen = true;
+    saveBeginner();
+    if (!placement) { placement = { passage: "none", accuracy: null, track: "memorization", startSurah: 78, startAyah: 1, beginnerStage: null, date: todayStr() }; }
+    placement.track = "memorization";
+    placement.startSurah = 78;
+    placement.startAyah = 1;
+    placement.beginnerStage = null;
+    savePlacement();
+    setLessonPicker(78, 1, 5);
+    renderBeginnerCard();
+    showScreen("today");
+  }
+
+  /* ---------- Qira'at (Hafs / Warsh) — one setter for sheet + stage ---------- */
+  function setQiraat(q) {
+    if (q !== "hafs" && q !== "warsh") { return; }
+    state.qiraat = q;
+    saveState();
+    updatePill();
+    syncQiraatToggle();
+    var wn = el("warshNote");
+    if (wn) { wn.hidden = q !== "warsh"; }
+  }
+  function syncQiraatToggle() {
+    forEach(document.querySelectorAll("[data-qiraat-mini]"), function (b) {
+      b.classList.toggle("is-on", b.getAttribute("data-qiraat-mini") === state.qiraat);
+    });
+    markSelected("[data-qiraat]", "data-qiraat", state.qiraat || "");
+  }
+
   /* ---------- Wire up (v2 + v3) ---------- */
 
   function init() {
     loadState();
     loadPrefs();
     loadAccount();
-    loadProgress();
-    buildJuzGrid();
-    renderVerse();
+    loadPlacement();
+    loadBeginner();
+    planKind = "surah"; // v5: the plan picker is gone; the "Choose" sheet picks a surah
     renderAccount();
     wireAudio();
-
-    forEach(document.querySelectorAll("[data-mode]"), function (b) {
-      b.addEventListener("click", function () {
-        state.mode = b.getAttribute("data-mode");
-        markSelected("[data-mode]", "data-mode", state.mode);
-        saveState();
-        updateSummary();
-        showScreen("qiraat");
-      });
-    });
-
-    forEach(document.querySelectorAll("[data-qiraat]"), function (b) {
-      b.addEventListener("click", function () {
-        state.qiraat = b.getAttribute("data-qiraat");
-        markSelected("[data-qiraat]", "data-qiraat", state.qiraat);
-        saveState();
-        updatePill();
-        updateSummary();
-        showScreen("time");
-      });
-    });
-
-    forEach(document.querySelectorAll("[data-minutes]"), function (b) {
-      b.addEventListener("click", function () {
-        state.minutes = parseInt(b.getAttribute("data-minutes"), 10);
-        markSelected("[data-minutes]", "data-minutes", String(state.minutes));
-        saveState();
-        updateSplit();
-        updateSummary();
-      });
-    });
-
-    forEach(document.querySelectorAll("[data-task]"), function (b) {
-      b.addEventListener("click", function () {
-        openPractice(b.getAttribute("data-task"));
-      });
-    });
 
     forEach(document.querySelectorAll("[data-goto]"), function (b) {
       b.addEventListener("click", function () {
@@ -3832,27 +4109,106 @@
       });
     });
 
-    el("micBtn").addEventListener("click", toggleMic);
-    el("practiceAgain").addEventListener("click", function () {
-      lastResult = null;
-      renderVerse();
-      el("practiceResult").hidden = true;
-      el("practiceStatus").textContent = "";
-      clearMicError();
-      el("heardLine").hidden = true;
-      el("interimLine").hidden = true;
+    /* --- sheets: click the backdrop to close --- */
+    forEach(document.querySelectorAll(".sheet-overlay"), function (ov) {
+      ov.addEventListener("click", function (ev) {
+        if (ev.target === ov) { ov.hidden = true; }
+      });
     });
-    el("practiceNext").addEventListener("click", nextVerse);
-    el("practiceClose").addEventListener("click", closePractice);
 
-    if (state.mode) { markSelected("[data-mode]", "data-mode", state.mode); }
-    if (state.qiraat) { markSelected("[data-qiraat]", "data-qiraat", state.qiraat); }
-    markSelected("[data-minutes]", "data-minutes", String(state.minutes));
-    updatePill();
-    updateSplit();
-    updateSummary();
+    /* --- Qira'at: top-bar pill opens the sheet; stage mini-toggle too --- */
+    el("qiraatPill").addEventListener("click", function () { openSheet("qiraatSheet"); });
+    el("qiraatSheetClose").addEventListener("click", function () { closeSheet("qiraatSheet"); });
+    forEach(document.querySelectorAll("[data-qiraat]"), function (b) {
+      b.addEventListener("click", function () {
+        setQiraat(b.getAttribute("data-qiraat"));
+        closeSheet("qiraatSheet");
+      });
+    });
+    forEach(document.querySelectorAll("[data-qiraat-mini]"), function (b) {
+      b.addEventListener("click", function () { setQiraat(b.getAttribute("data-qiraat-mini")); });
+    });
 
-    /* --- v3 wiring --- */
+    /* --- intro + placement front door --- */
+    el("introGuestBtn").addEventListener("click", function () {
+      continueAsGuest();
+      if (placement && placement.track) { showScreen("today"); }
+      else { openPlacement(); }
+    });
+    el("placementMicBtn").addEventListener("click", togglePlacementMic);
+    el("placementShorterBtn").addEventListener("click", function () {
+      if (!placement) { placement = { passage: "fatiha" }; }
+      placement.passage = "ikhlas";
+      placementWords = placementExpectedWords().map(function (t) {
+        return { text: t, state: "pending", heard: "" };
+      });
+      placementHeardText = "";
+      el("placementResult").hidden = true;
+      setTxt("placementStatus", "");
+      renderPlacementPassage();
+    });
+    el("placementNoReadBtn").addEventListener("click", placementNoRead);
+    el("placementStartBtn").addEventListener("click", applyPlacement);
+
+    /* --- Today --- */
+    el("tierSabaqStart").addEventListener("click", function () { startLesson("sabaq"); });
+    el("tierSabqiStart").addEventListener("click", function () { startLesson("sabqi"); });
+    el("tierManzilStart").addEventListener("click", function () { startLesson("manzil"); });
+    el("lessonDiagnosticBtn").addEventListener("click", lessonDiagnostic);
+    el("timeMinus").addEventListener("click", function () { cycleTime(-1); });
+    el("timePlus").addEventListener("click", function () { cycleTime(1); });
+    el("chooseLink").addEventListener("click", function () { openSheet("chooseSheet"); });
+    el("chooseSheetClose").addEventListener("click", function () { closeSheet("chooseSheet"); });
+    el("chooseApplyBtn").addEventListener("click", function () {
+      var surahNum = parseInt(el("lessonSurahSelect").value, 10) || 1;
+      var from = parseInt(el("lessonFrom").value, 10) || 1;
+      var to = parseInt(el("lessonTo").value, 10) || from;
+      setLessonPicker(surahNum, from, to);
+      closeSheet("chooseSheet");
+    });
+    el("beginnerCardBtn").addEventListener("click", function () {
+      if (beginnerState) { startBeginnerStage(beginnerState.currentStage); }
+    });
+    el("beginnerPathLink").addEventListener("click", function () { showScreen("beginner"); });
+    el("dueReviewBtn").addEventListener("click", function () {
+      var due = getDueItems(todayStr());
+      if (due.length) { startDueReview(sm2Key(due[0].surah, due[0].from, due[0].to)); }
+    });
+    forEach(document.querySelectorAll("[data-level]"), function (b) {
+      b.addEventListener("click", function () { setLessonLevel(b.getAttribute("data-level")); });
+    });
+    // The picker edits the Sabaq start; the level sets its length.
+    el("lessonSurahSelect").addEventListener("change", function () {
+      el("lessonFrom").value = 1;
+      var surah = getSurah(parseInt(el("lessonSurahSelect").value, 10) || 1);
+      el("lessonTo").value = surah
+        ? Math.min(LESSON_LEVELS[lessonLevel].ayahs, surah.ayahs.length)
+        : LESSON_LEVELS[lessonLevel].ayahs;
+      renderLesson();
+    });
+    el("lessonJuzSelect").addEventListener("change", function () {
+      var jn = parseInt(el("lessonJuzSelect").value, 10) || 30;
+      var start = juzStarts[jn];
+      if (start) {
+        var surah = getSurah(start.surah);
+        el("lessonFrom").value = start.ayah;
+        el("lessonTo").value = surah
+          ? Math.min(start.ayah + LESSON_LEVELS[lessonLevel].ayahs - 1, surah.ayahs.length)
+          : start.ayah + LESSON_LEVELS[lessonLevel].ayahs - 1;
+      }
+      renderLesson();
+    });
+    el("lessonFrom").addEventListener("change", function () {
+      var from = parseInt(el("lessonFrom").value, 10) || 1;
+      var surah = getSurah(parseInt(el("lessonSurahSelect").value, 10) || 1);
+      if (surah) {
+        el("lessonTo").value = Math.min(from + LESSON_LEVELS[lessonLevel].ayahs - 1, surah.ayahs.length);
+      }
+      renderLesson();
+    });
+    el("lessonTo").addEventListener("change", function () { renderLesson(); });
+
+    /* --- Mushaf --- */
     el("surahSearch").addEventListener("input", function () {
       renderSurahList(el("surahSearch").value);
     });
@@ -3862,27 +4218,24 @@
     el("toolbarPlay").addEventListener("click", function () {
       if (player.playing) {
         pauseAudio();
-        el("toolbarPlay").textContent = "▶ Play";
+        el("toolbarPlay").textContent = "\u25B6 Play";
       } else if (player.ayahIndex >= 0 && player.surah === state.currentSurah) {
         playAyah(player.surah, player.ayahIndex, { continuous: true, fallbackReciterId: player.fallbackReciterId });
-        el("toolbarPlay").textContent = "⏸ Pause";
+        el("toolbarPlay").textContent = "\u23F8 Pause";
       } else {
         playAyah(state.currentSurah, 0, { continuous: true });
-        el("toolbarPlay").textContent = "⏸ Pause";
+        el("toolbarPlay").textContent = "\u23F8 Pause";
       }
     });
-    el("toolbarAudio").addEventListener("click", function () { showScreen("reciters"); });
-    el("toolbarTranslation").addEventListener("click", function () {
-      var note = el("translationNote");
-      note.hidden = !note.hidden;
-      el("toolbarTranslation").classList.toggle("is-on", !note.hidden);
+    el("toolbarReciter").addEventListener("click", function () { openSheet("reciterSheet"); });
+    el("toolbarFont").addEventListener("click", cycleReadFont);
+    el("toolbarSettings").addEventListener("click", function () { openSheet("readSettingsSheet"); });
+    el("reciterSheetClose").addEventListener("click", function () { closeSheet("reciterSheet"); });
+    el("readSettingsClose").addEventListener("click", function () { closeSheet("readSettingsSheet"); });
+    el("settingsReciterBtn").addEventListener("click", function () {
+      closeSheet("readSettingsSheet");
+      openSheet("reciterSheet");
     });
-    el("toolbarMore").addEventListener("click", function () {
-      var panel = el("readSettings");
-      panel.hidden = !panel.hidden;
-      el("toolbarMore").classList.toggle("is-on", !panel.hidden);
-    });
-    el("settingsReciterBtn").addEventListener("click", function () { showScreen("reciters"); });
     el("speedSelect").addEventListener("change", function () {
       player.speed = parseFloat(el("speedSelect").value);
       audioEl.playbackRate = player.speed;
@@ -3930,31 +4283,32 @@
       updateTranslitButton();
     });
     el("downloadSurahBtn").addEventListener("click", downloadSurah);
-
-    /* --- layout-fix round (Nov 2) --- */
-    el("diagStart").addEventListener("click", openDiagnostic);
-    el("diagRetake").addEventListener("click", openDiagnostic);
-    el("diagStartLearning").addEventListener("click", function () {
-      if (!diagRecommendation) { return; }
-      state.mode = diagRecommendation.mode;
-      markSelected("[data-mode]", "data-mode", state.mode);
-      saveState();
-      setChosenSurah(diagRecommendation.surah);
-      updateSummary();
-      closePractice();
-      showScreen("loop");
+    el("learnThisSurahBtn").addEventListener("click", function () {
+      setLessonPicker(state.currentSurah, 1, LESSON_LEVELS[lessonLevel].ayahs);
+      showScreen("today");
     });
-    el("changeLearningBtn").addEventListener("click", function () { showScreen("surahs"); });
-    el("learnThisSurahBtn").addEventListener("click", function () { chooseSurah(state.currentSurah); });
+    el("wordSheetClose").addEventListener("click", function () { closeSheet("wordSheet"); });
+    el("wordSheetPractice").addEventListener("click", function () {
+      if (!wordSheetAyah) { return; }
+      closeSheet("wordSheet");
+      openLive(wordSheetAyah.surah, wordSheetAyah.ayah, wordSheetAyah.ayah, { returnTo: "read" });
+      setCapMode("beginner");
+    });
+
+    /* --- Progress --- */
+    el("retakePlacementBtn").addEventListener("click", openPlacement);
+    el("progressClearFixBtn").addEventListener("click", function () {
+      liveMistakes = [];
+      saveLiveMistakes();
+      renderLiveHistory();
+    });
+    el("graduationStartBtn").addEventListener("click", applyGraduation);
 
     /* --- live feedback mode --- */
     el("liveFeedbackBtn").addEventListener("click", function () {
       var surah = getSurah(state.currentSurah);
-      openLive(state.currentSurah, 1, Math.min(5, surah ? surah.ayahs.length : 5));
-    });
-    el("loopLiveBtn").addEventListener("click", function () {
-      var ranges = currentTaskRanges();
-      openLive(ranges.sabaq.surah, ranges.sabaq.from, ranges.sabaq.to);
+      setCapMode("beginner");
+      openLive(state.currentSurah, 1, Math.min(5, surah ? surah.ayahs.length : 5), { returnTo: "read" });
     });
     el("liveMicBtn").addEventListener("click", toggleLiveMic);
     el("livePrevBtn").addEventListener("click", livePrev);
@@ -3966,14 +4320,14 @@
       if (!live) { return; }
       openLive(live.surah, parseInt(el("liveFrom").value, 10), parseInt(el("liveTo").value, 10));
     });
-    el("liveChangeSurah").addEventListener("click", function () { showScreen("surahs"); });
+    el("liveChangeSurah").addEventListener("click", function () { showScreen("mushaf"); });
     el("liveHoldToggle").addEventListener("click", function () { setLiveHold(!liveHold); });
-    el("liveClearHistoryBtn").addEventListener("click", function () {
-      liveMistakes = [];
-      saveLiveMistakes();
-      renderLiveHistory();
+    el("liveCloseX").addEventListener("click", closeLive);
+    el("recapNextBtn").addEventListener("click", nextLessonAfterRecap);
+    el("recapBackBtn").addEventListener("click", function () {
+      stopLiveListening();
+      showScreen("today");
     });
-    el("liveCloseBtn").addEventListener("click", function () { showScreen("lesson"); });
     el("liveSheetClose").addEventListener("click", closeLiveSheet);
     el("liveSheetCloseBtn").addEventListener("click", closeLiveSheet);
     el("liveSheet").addEventListener("click", function (ev) {
@@ -3987,7 +4341,7 @@
       if (localStorage.getItem("sabaq-v3-live-hold") === "on") { setLiveHold(true); }
     } catch (e) {}
 
-    /* --- v4: intro / plan / lesson / captions --- */
+    /* --- v4: captions / lesson / progress stores --- */
     loadCapPrefs();
     loadLessonLevel();
     loadCompletedLessons();
@@ -3999,52 +4353,9 @@
     loadSurahCoverage();
     setCapMode(capMode);
     setCapFont(capFont);
-    el("introGuestBtn").addEventListener("click", function () { continueAsGuest(); showScreen("plan"); });
-    forEach(document.querySelectorAll("[data-plan]"), function (b) {
-      b.addEventListener("click", function () { openPlan(b.getAttribute("data-plan")); });
-    });
-    forEach(document.querySelectorAll("[data-level]"), function (b) {
-      b.addEventListener("click", function () { setLessonLevel(b.getAttribute("data-level")); });
-    });
-    el("tierSabaqStart").addEventListener("click", function () { startLesson("sabaq"); });
-    el("tierSabqiStart").addEventListener("click", function () { startLesson("sabqi"); });
-    el("tierManzilStart").addEventListener("click", function () { startLesson("manzil"); });
-    el("lessonDiagnosticBtn").addEventListener("click", lessonDiagnostic);
-    el("lessonResumeBtn").addEventListener("click", function () {
-      if (!lastPosition) { return; }
-      openLive(lastPosition.surah, lastPosition.from, lastPosition.to);
-      saveLastPosition();
-    });
-    // The picker edits the Sabaq start; the level sets its length.
-    el("lessonSurahSelect").addEventListener("change", function () {
-      el("lessonFrom").value = 1;
-      var surah = getSurah(parseInt(el("lessonSurahSelect").value, 10) || 1);
-      el("lessonTo").value = surah
-        ? Math.min(LESSON_LEVELS[lessonLevel].ayahs, surah.ayahs.length)
-        : LESSON_LEVELS[lessonLevel].ayahs;
-      renderLesson();
-    });
-    el("lessonJuzSelect").addEventListener("change", function () {
-      var jn = parseInt(el("lessonJuzSelect").value, 10) || 30;
-      var start = juzStarts[jn];
-      if (start) {
-        var surah = getSurah(start.surah);
-        el("lessonFrom").value = start.ayah;
-        el("lessonTo").value = surah
-          ? Math.min(start.ayah + LESSON_LEVELS[lessonLevel].ayahs - 1, surah.ayahs.length)
-          : start.ayah + LESSON_LEVELS[lessonLevel].ayahs - 1;
-      }
-      renderLesson();
-    });
-    el("lessonFrom").addEventListener("change", function () {
-      var from = parseInt(el("lessonFrom").value, 10) || 1;
-      var surah = getSurah(parseInt(el("lessonSurahSelect").value, 10) || 1);
-      if (planKind !== "ayah" && planKind !== "review" && surah) {
-        el("lessonTo").value = Math.min(from + LESSON_LEVELS[lessonLevel].ayahs - 1, surah.ayahs.length);
-      }
-      renderLesson();
-    });
-    el("lessonTo").addEventListener("change", function () { renderLesson(); });
+    if (state.qiraat) { syncQiraatToggle(); }
+    updatePill();
+    updateSplit();
     forEach(document.querySelectorAll("[data-capmode]"), function (b) {
       b.addEventListener("click", function () { setCapMode(b.getAttribute("data-capmode")); });
     });
@@ -4053,8 +4364,9 @@
     });
     el("liveTeacherBtn").addEventListener("click", playTeacher);
 
-    showScreen("intro");
-    animateBasmala();
+    // Returning user (placement stored) skips the front door (spec 2).
+    if (placement && placement.track) { showScreen("today"); }
+    else { showScreen("intro"); animateBasmala(); }
     loadData();
   }
 
@@ -4063,22 +4375,12 @@
     normalizeArabic: normalizeArabic,
     scoreRecitation: scoreRecitation,
     bank: VERSE_BANK,
-    getVerseIndex: function () { return verseIndex; },
-    getTask: function () { return state.task; },
-    getPracticeRef: function () { var v = currentVerse(); return v ? v.ref : ""; },
-    getPracticeVerseText: function () { var v = currentVerse(); return v ? v.arabic : ""; },
-    getActiveVerseCount: function () { return activeVerses.length; },
-    getTaskVerseCount: function (task) { return taskVerses[task] ? taskVerses[task].length : 0; },
-    getListening: function () { return listening; },
-    scoreTranscript: function (text) { finalTranscript = text; finishListening(); },
     // Groq ear hooks (test-only; the key never lives in the app)
     groqConfigured: function () { return !!SABAQ_EAR_URL; },
     groqAvailable: groqAvailable,
     whichEarWouldUse: function () { return groqAvailable() ? EAR_GROQ : EAR_BROWSER; },
     getEarInUse: function () { return earInUse; },
-    getEarLine: function () { return el("earLine") ? el("earLine").textContent : ""; },
     setEarUrl: function (url) { SABAQ_EAR_URL = url || ""; },
-    scoreGroqTranscript: function (text) { setEarLine(EAR_GROQ); finalTranscript = text; finishListening(); },
     // v3 hooks
     dataLoaded: function () { return dataLoaded; },
     dataError: function () { return dataError; },
@@ -4094,7 +4396,7 @@
     getReciters: function () { return reciterData ? reciterData.reciters.map(function (r) { return r.id; }) : []; },
     setReciter: setReciter,
     openRead: openRead,
-    openSurahs: function () { showScreen("surahs"); },
+    openSurahs: function () { showScreen("mushaf"); },
     audioUrlFor: function (reciterId, surahNum, ayahInSurah) {
       var r = getReciter(reciterId);
       return r ? audioUrl(r, surahNum, ayahInSurah) : null;
@@ -4124,21 +4426,22 @@
     getAccountType: function () { return state.account ? state.account.type : null; },
     continueAsGuest: continueAsGuest,
     getChosenSurah: function () { return state.chosenSurah; },
-    setChosenSurah: setChosenSurah,
+    setChosenSurah: function (num) {
+      var surah = getSurah(num);
+      if (!surah) { return false; }
+      state.chosenSurah = num;
+      saveState();
+      return setLessonPicker(num, 1, LESSON_LEVELS[lessonLevel].ayahs);
+    },
     getTaskTitles: function () {
       return {
-        sabaq: el("taskTitleSabaq") ? el("taskTitleSabaq").textContent : "",
-        sabqi: el("taskTitleSabqi") ? el("taskTitleSabqi").textContent : "",
-        manzil: el("taskTitleManzil") ? el("taskTitleManzil").textContent : ""
+        sabaq: el("tierSabaqTitle") ? el("tierSabaqTitle").textContent : "",
+        sabqi: el("tierSabqiTitle") ? el("tierSabqiTitle").textContent : "",
+        manzil: el("tierManzilTitle") ? el("tierManzilTitle").textContent : ""
       };
     },
-    getLearningLine: function () { return el("learningLine") ? el("learningLine").textContent : ""; },
     openJuz: openJuz,
     getJuzStart: function (n) { return juzStarts[n] || null; },
-    openDiagnostic: openDiagnostic,
-    getDiagVerseCount: function () { return diagVerses ? diagVerses.length : 0; },
-    getDiagScores: function () { return diagScores.slice(); },
-    getDiagRecommendation: function () { return diagRecommendation; },
     getViewportMeta: function () {
       var m = document.querySelector('meta[name="viewport"]');
       return m ? m.getAttribute("content") : "";
@@ -4148,7 +4451,8 @@
       return {
         surah: live.surah, from: live.from, to: live.to, idx: live.idx,
         ayahRef: live.ayahs[live.idx].ref, total: live.ayahs.length,
-        listening: liveListening, hold: liveHold, tier: live.tier
+        listening: liveListening, hold: liveHold, tier: live.tier,
+        beginnerStage: live.beginnerStage || null
       };
     },
     getLiveWords: function () {
@@ -4181,7 +4485,6 @@
       renderLesson();
     },
     getPlan: function () { return planKind; },
-    openPlan: openPlan,
     startLesson: startLesson,
     lessonDiagnostic: lessonDiagnostic,
     getLessonLevel: function () { return lessonLevel; },
@@ -4372,6 +4675,107 @@
       liveMistakes = [];
       saveLiveMistakes();
       renderLiveHistory();
+    },
+    // v5 hooks: placement, beginner path, recap, Progress, Mushaf flow.
+    getPlacement: function () { return placement ? JSON.parse(JSON.stringify(placement)) : null; },
+    openPlacement: openPlacement,
+    applyPlacementTranscript: applyPlacementTranscript,
+    getPlacementWords: function () {
+      return placementWords.map(function (w) { return { text: w.text, state: w.state }; });
+    },
+    setPlacementPassage: function (key) {
+      if (!placement) { placement = { passage: "fatiha" }; }
+      placement.passage = key === "ikhlas" ? "ikhlas" : "fatiha";
+      placementWords = placementExpectedWords().map(function (t) {
+        return { text: t, state: "pending", heard: "" };
+      });
+      renderPlacementPassage();
+    },
+    placementNoRead: placementNoRead,
+    applyPlacement: applyPlacement,
+    placementBandFor: placementBandFor,
+    getBeginner: function () { return beginnerState ? JSON.parse(JSON.stringify(beginnerState)) : null; },
+    getBeginnerStages: function () { return BEGINNER_STAGES; },
+    startBeginnerStage: startBeginnerStage,
+    passBeginnerStage: passBeginnerStage,
+    applyGraduation: applyGraduation,
+    getRecap: function () {
+      var c = el("recapCard");
+      var fix = [];
+      forEach(document.querySelectorAll("#recapFixList .live-mistake"), function (n) {
+        fix.push(n.textContent);
+      });
+      return {
+        hidden: c ? c.hidden : true,
+        visible: c ? !c.hidden : false,
+        fixList: fix,
+        title: el("recapTitle") ? el("recapTitle").textContent : "",
+        xp: el("recapXp") ? el("recapXp").textContent : "",
+        xpExtra: el("recapXpExtra") ? el("recapXpExtra").textContent : "",
+        words: el("recapWords") ? el("recapWords").textContent : "",
+        mistakes: el("recapMistakes") ? el("recapMistakes").textContent : "",
+        streak: el("recapStreak") ? el("recapStreak").textContent : "",
+        due: el("recapDue") ? el("recapDue").textContent : "",
+        diagHidden: el("recapDiagReport") ? el("recapDiagReport").hidden : true,
+        diagLine: el("recapDiagLine") ? el("recapDiagLine").textContent : "",
+        note: el("recapNote") ? el("recapNote").textContent : ""
+      };
+    },
+    closeLive: closeLive,
+    nextLessonAfterRecap: nextLessonAfterRecap,
+    getParentView: function () { return el("parentBody") ? el("parentBody").textContent : ""; },
+    getWeekChart: function () {
+      var out = [];
+      forEach(document.querySelectorAll("#weekChart .week-bar"), function (b) {
+        out.push({ h: b.style.height, title: b.getAttribute("title") });
+      });
+      return out;
+    },
+    getJuzTile: function (n) {
+      var t = document.querySelector('.juz-tile[data-juz="' + n + '"]');
+      if (!t) { return null; }
+      return { cls: t.className, fill: t.getAttribute("data-fill"), text: t.textContent };
+    },
+    getJuzMapLine: function () { return el("juzMapLine") ? el("juzMapLine").textContent : ""; },
+    openWordSheet: openWordSheet,
+    getWordSheet: function () {
+      return {
+        hidden: el("wordSheet") ? el("wordSheet").hidden : true,
+        ar: el("wordSheetAr") ? el("wordSheetAr").textContent : "",
+        gloss: el("wordSheetGloss") ? el("wordSheetGloss").textContent : "",
+        pills: el("wordSheetPills") ? el("wordSheetPills").textContent : ""
+      };
+    },
+    getFlowAyahs: function () {
+      var out = [];
+      forEach(document.querySelectorAll(".flow-ayah"), function (a) {
+        out.push({ ayah: a.getAttribute("data-ayah"), text: a.textContent });
+      });
+      return out;
+    },
+    getBismillahState: function () {
+      var b = el("readBismillah");
+      var first = document.querySelector(".flow-ayah");
+      return {
+        bismillahHidden: b ? b.hidden : null,
+        firstAyahText: first ? first.textContent : ""
+      };
+    },
+    setQiraat: setQiraat,
+    getQiraat: function () { return state.qiraat; },
+    getReadFont: function () { return readFont; },
+    cycleReadFont: cycleReadFont,
+    renderToday: renderToday,
+    renderProgress: renderProgress,
+    getTierState: function () {
+      return {
+        sabaq: { title: el("tierSabaqTitle").textContent, sub: el("tierSabaqSub").textContent,
+                 disabled: el("tierSabaqStart").disabled, hidden: el("tierSabaqStart").hidden },
+        sabqi: { title: el("tierSabqiTitle").textContent, sub: el("tierSabqiSub").textContent,
+                 disabled: el("tierSabqiStart").disabled, hidden: el("tierSabqiStart").hidden },
+        manzil: { title: el("tierManzilTitle").textContent, sub: el("tierManzilSub").textContent,
+                  disabled: el("tierManzilStart").disabled, hidden: el("tierManzilStart").hidden }
+      };
     },
     // Quran-wide scorer self-check: every ayah scored against its own
     // plain (diacritic-free) form must be 100.
