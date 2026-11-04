@@ -100,6 +100,13 @@
     </div>
     <p class="lesson-level-note" id="lessonLevelNote">Beginner: 5 new ayahs a day.</p>
 
+    <!-- v4c: due for review — SM-2 items whose review date has come. -->
+    <div class="due-section" id="dueSection" hidden>
+      <p class="due-title">Due for review &middot; <span id="dueCount">0</span></p>
+      <p class="due-sub">These lessons are due — review the most overdue first.</p>
+      <div class="due-list" id="dueList"></div>
+    </div>
+
     <div class="tier-list">
       <div class="tier-card" id="tierSabaq">
         <p class="tier-kicker">Sabaq &middot; today&rsquo;s new lesson</p>
@@ -119,6 +126,51 @@
         <p class="tier-sub" id="tierManzilSub">Once you finish lessons in another juz, it will rotate here.</p>
         <button class="primary-btn tier-start" type="button" id="tierManzilStart" disabled>Start Manzil &rarr;</button>
       </div>
+    </div>
+
+    <!-- v4c: this week + badges — only from real completed lessons. -->
+    <div class="stats-section" id="statsSection">
+      <p class="stats-title">This week</p>
+      <!-- v4c: XP + level — 50 XP per lesson, 500 per surah, 5,000 per juz. -->
+      <div class="xp-banner" id="xpBanner">
+        <div class="xp-line">
+          <span class="xp-total" id="xpTotal">0 XP</span>
+          <span class="xp-level" id="xpLevel">Newcomer</span>
+        </div>
+        <div class="xp-bar"><span class="xp-bar-fill" id="xpBarFill" style="width:0%"></span></div>
+        <p class="xp-next" id="xpNext">250 XP to Student</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-num" id="statWordsWeek">&mdash;</span>
+          <span class="stat-label">Words heard</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statLessonsWeek">&mdash;</span>
+          <span class="stat-label">Lessons done</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statAccuracyWeek">&mdash;</span>
+          <span class="stat-label">Accuracy</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statDueCount">&mdash;</span>
+          <span class="stat-label">Due for review</span>
+        </div>
+      </div>
+      <p class="stats-note" id="statsNote">No lessons yet this week — your numbers will show here.</p>
+      <!-- v4c: daily quest — finish 30 verses or 1 juz. -->
+      <div class="quest-card" id="questCard">
+        <p class="quest-title">Daily quest</p>
+        <p class="quest-text" id="questText">Finish 30 verses or 1 juz</p>
+        <div class="xp-bar"><span class="xp-bar-fill" id="questBarFill" style="width:0%"></span></div>
+        <p class="quest-progress" id="questProgress">0 / 30 verses today</p>
+      </div>
+    </div>
+
+    <div class="badges-section" id="badgesSection">
+      <p class="stats-title">Badges</p>
+      <div class="badge-grid" id="badgeGrid"></div>
     </div>
 
     <div class="lesson-picker" id="lessonPicker">
@@ -155,6 +207,18 @@
       <span class="diag-title">Where are you?</span>
       <span class="diag-sub">Find your level — recite 3 short verses and we will point you to the right starting surah.</span>
     </button>
+    <!-- v4c: daily streak — a day counts when a lesson is completed. -->
+    <div class="streak-card" id="streakCard">
+      <div class="streak-main">
+        <span class="streak-flame" aria-hidden="true">&#128293;</span>
+        <span class="streak-num" id="streakNum">0</span>
+        <span class="streak-label" id="streakLabel">day streak</span>
+      </div>
+      <p class="streak-best" id="streakBest">Best: 0 days</p>
+      <div class="streak-dots" id="streakDots" aria-label="Last 7 days"></div>
+      <p class="streak-note" id="streakNote">Finish a lesson to start your streak.</p>
+      <p class="streak-quest" id="streakQuest">Daily quest: 0 / 30 verses</p>
+    </div>
     <p class="account-line" id="accountLine" hidden>You&rsquo;re learning as a guest — your progress stays on this device.</p>
 
     <div class="mode-grid">

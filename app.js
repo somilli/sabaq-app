@@ -227,6 +227,7 @@
     });
     if (name !== "loop") { closePractice(); }
     if (name !== "live") { stopLiveListening(); }
+    if (name === "home") { renderStreakCard(); }
     window.scrollTo(0, 0);
   }
 
@@ -1893,7 +1894,7 @@
     try { localStorage.setItem("sabaq-v4-completed", JSON.stringify(completedLessons)); } catch (e) {}
   }
 
-  function recordCompletedLesson(surah, from, to) {
+  function recordCompletedLesson(surah, from, to, result) {
     if (!surah || !from) { return; }
     completedLessons = completedLessons.filter(function (l) {
       return !(l.surah === surah && l.from === from && l.to === to);
@@ -1901,6 +1902,632 @@
     completedLessons.unshift({ surah: surah, from: from, to: to, ts: Date.now() });
     if (completedLessons.length > 20) { completedLessons.length = 20; }
     saveCompletedLessons();
+    // v4c: a lesson with real heard words also feeds SM-2, the streak,
+    // the lesson log, the word counter and the juz coverage. A lesson
+    // recorded without a result (old callers) only feeds Sabqi/Manzil.
+    if (result && typeof result.heard === "number" && typeof result.total === "number" && result.total > 0) {
+      var today = todayStr();
+      var accuracy = Math.round(result.heard / result.total * 100);
+      var grade = gradeForAccuracy(accuracy);
+      recordLessonLog({ date: today, heard: result.heard, total: result.total,
+                        surah: surah, from: from, to: to, ts: Date.now() });
+      recordStreakDay(today);
+      progressTotals.wordsHeard += result.heard;
+      progressTotals.lessons += 1;
+      saveTotals();
+      markCoverage(surah, from, to);
+      saveJuzCoverage();
+      saveSurahCoverage();
+      bankXpFinishes(surah, from, to, today);
+      sm2Update(surah, from, to, grade, today);
+    }
+  }
+
+  /* ================= v4c: SM-2 + streaks + badges + progress ============
+     Everything here is localStorage only, guest only, no network, no
+     new AI cost. Nothing is invented: every number comes from a real
+     completed lesson (or a real diagnostic). The ear, the modes, the
+     caption line and the v4b look are untouched.
+     Grade mapping (accuracy = words heard / words in the lesson):
+       >= 95% -> 5 · 85–94% -> 4 · 70–84% -> 3 · 50–69% -> 2 · < 50% -> 1
+     "Heard" counts words in state good / fixed / dismissed — the same
+     definition the diagnostic report uses, so a dismissed word (the
+     user's override of a false positive) counts as heard. */
+
+  /* ---------- Dates (local-timezone calendar days) ---------- */
+  var testToday = null; // test-only override, "YYYY-MM-DD" or null
+  function pad2(n) { return ("0" + n).slice(-2); }
+  function localDateStr(d) {
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function parseLocalDate(s) {
+    var p = String(s || "").split("-");
+    return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  }
+  function addDaysStr(dateStr, n) {
+    var d = parseLocalDate(dateStr);
+    d.setDate(d.getDate() + n);
+    return localDateStr(d);
+  }
+  function todayStr() { return testToday || localDateStr(new Date()); }
+  function daysBetween(a, b) {
+    return Math.round((parseLocalDate(b) - parseLocalDate(a)) / 86400000);
+  }
+  var MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function fmtShortDate(dateStr) {
+    var d = parseLocalDate(dateStr);
+    return d.getDate() + " " + MONTHS_SHORT[d.getMonth()];
+  }
+
+  /* ---------- SM-2 spaced repetition ---------- */
+  // One record per lesson range, keyed "surah:from-to". Not capped at 20
+  // like completedLessons — a review item must survive until it is due.
+  var sm2 = {};
+  function sm2Key(surah, from, to) { return surah + ":" + from + "-" + to; }
+  function loadSM2() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-sm2");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") {
+        Object.keys(saved).forEach(function (k) {
+          var r = saved[k];
+          if (r && typeof r.surah === "number" && typeof r.from === "number" &&
+              typeof r.due === "string") { sm2[k] = r; }
+        });
+      }
+    } catch (e) {}
+  }
+  function saveSM2() {
+    try { localStorage.setItem("sabaq-v4-sm2", JSON.stringify(sm2)); } catch (e) {}
+  }
+  function gradeForAccuracy(acc) {
+    if (acc >= 95) { return 5; }
+    if (acc >= 85) { return 4; }
+    if (acc >= 70) { return 3; }
+    if (acc >= 50) { return 2; }
+    return 1;
+  }
+  function sm2Update(surah, from, to, grade, today) {
+    var key = sm2Key(surah, from, to);
+    var r = sm2[key] || { surah: surah, from: from, to: to,
+                          ef: 2.5, interval: 0, reps: 0, due: today,
+                          grade: null, ts: 0 };
+    // Ease factor moves on every review (classic SM-2), floored at 1.3.
+    r.ef = Math.max(1.3, r.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)));
+    if (grade >= 3) {
+      if (r.reps === 0) { r.interval = 1; }
+      else if (r.reps === 1) { r.interval = 6; }
+      else { r.interval = Math.max(1, Math.round(r.interval * r.ef)); }
+      r.reps += 1;
+    } else {
+      // Failed review: start the ladder again, due tomorrow.
+      r.reps = 0;
+      r.interval = 1;
+    }
+    r.grade = grade;
+    r.due = addDaysStr(today, r.interval);
+    r.ts = Date.now();
+    sm2[key] = r;
+    saveSM2();
+    return r;
+  }
+  function getDueItems(today) {
+    var out = [];
+    Object.keys(sm2).forEach(function (k) { out.push(sm2[k]); });
+    out = out.filter(function (r) { return r.due <= today; });
+    out.sort(function (a, b) {
+      if (a.due !== b.due) { return a.due < b.due ? -1 : 1; }
+      return (a.ts || 0) - (b.ts || 0);
+    });
+    return out;
+  }
+  function getNextDueDate(today) {
+    var next = null;
+    Object.keys(sm2).forEach(function (k) {
+      var d = sm2[k].due;
+      if (d > today && (next === null || d < next)) { next = d; }
+    });
+    return next;
+  }
+
+  /* ---------- Daily streak ---------- */
+  var streakDays = []; // ["YYYY-MM-DD", ...] — one entry per day a lesson was completed
+  function loadStreakDays() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-days");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (Array.isArray(saved)) {
+        streakDays = saved.filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      }
+    } catch (e) {}
+  }
+  function saveStreakDays() {
+    try { localStorage.setItem("sabaq-v4-days", JSON.stringify(streakDays)); } catch (e) {}
+  }
+  function recordStreakDay(dateStr) {
+    if (streakDays.indexOf(dateStr) < 0) {
+      streakDays.push(dateStr);
+      streakDays.sort();
+      saveStreakDays();
+    }
+  }
+  function streakStats(today) {
+    var set = {};
+    streakDays.forEach(function (d) { set[d] = true; });
+    var sorted = Object.keys(set).sort();
+    var best = 0, run = 0, prev = null;
+    sorted.forEach(function (d) {
+      run = (prev && daysBetween(prev, d) === 1) ? run + 1 : 1;
+      if (run > best) { best = run; }
+      prev = d;
+    });
+    // Current streak: the run ending today — or ending yesterday when
+    // today has no lesson yet (the streak is still alive until midnight).
+    var current = 0;
+    var cursor = set[today] ? today : addDaysStr(today, -1);
+    while (set[cursor]) { current++; cursor = addDaysStr(cursor, -1); }
+    return { current: current, best: best, days: streakDays.slice() };
+  }
+  function weekDots(today) {
+    var set = {};
+    streakDays.forEach(function (d) { set[d] = true; });
+    var letters = ["S", "M", "T", "W", "T", "F", "S"];
+    var out = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = addDaysStr(today, -i);
+      out.push({ date: d, label: letters[parseLocalDate(d).getDay()],
+                 done: !!set[d], isToday: i === 0 });
+    }
+    return out;
+  }
+
+  /* ---------- Lesson log (weekly analytics source of truth) ---------- */
+  var lessonLog = []; // {date, heard, total, surah, from, to, ts} — max 100
+  function loadLessonLog() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-lesson-log");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (Array.isArray(saved)) {
+        lessonLog = saved.filter(function (e) {
+          return e && typeof e.date === "string" &&
+            typeof e.heard === "number" && typeof e.total === "number";
+        }).slice(0, 100);
+      }
+    } catch (e) {}
+  }
+  function saveLessonLog() {
+    try { localStorage.setItem("sabaq-v4-lesson-log", JSON.stringify(lessonLog)); } catch (e) {}
+  }
+  function recordLessonLog(entry) {
+    lessonLog.unshift(entry);
+    if (lessonLog.length > 100) { lessonLog.length = 100; }
+    saveLessonLog();
+  }
+
+  /* ---------- Lifetime totals ---------- */
+  // xpSurahs / xpJuz record finishes whose XP has already been banked
+  // (each with its date) — so a surah or juz can only ever pay out once.
+  var progressTotals = { wordsHeard: 0, lessons: 0, diagnostics: [], xpSurahs: [], xpJuz: [] };
+  function loadTotals() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-totals");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") {
+        if (typeof saved.wordsHeard === "number") { progressTotals.wordsHeard = saved.wordsHeard; }
+        if (typeof saved.lessons === "number") { progressTotals.lessons = saved.lessons; }
+        if (Array.isArray(saved.diagnostics)) {
+          progressTotals.diagnostics = saved.diagnostics.filter(function (d) {
+            return /^\d{4}-\d{2}-\d{2}$/.test(d);
+          }).slice(0, 50);
+        }
+        if (Array.isArray(saved.xpSurahs)) {
+          progressTotals.xpSurahs = saved.xpSurahs.filter(function (e) {
+            return e && typeof e.surah === "number" && typeof e.date === "string";
+          });
+        }
+        if (Array.isArray(saved.xpJuz)) {
+          progressTotals.xpJuz = saved.xpJuz.filter(function (e) {
+            return e && typeof e.juz === "number" && typeof e.date === "string";
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  function saveTotals() {
+    try { localStorage.setItem("sabaq-v4-totals", JSON.stringify(progressTotals)); } catch (e) {}
+  }
+  function recordDiagnosticCompletion() {
+    if (!live || live.diagRecorded) { return; }
+    live.diagRecorded = true;
+    progressTotals.diagnostics.push(todayStr());
+    if (progressTotals.diagnostics.length > 50) { progressTotals.diagnostics.shift(); }
+    saveTotals();
+  }
+
+  /* ---------- Juz + surah coverage (for the "First Juz Finished" badge
+     and for XP surah/juz payouts) ---------- */
+  // Cumulative maps juz -> {"surah:ayah": true} and surah -> {"ayah": true}
+  // for every ayah ever in a completed lesson. Unlike completedLessons
+  // they are never capped, so a juz or surah finished over many lessons
+  // still counts.
+  var juzCoverage = {};
+  var surahCoverage = {};
+  function loadJuzCoverage() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-juz-ayahs");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") { juzCoverage = saved; }
+    } catch (e) {}
+  }
+  function saveJuzCoverage() {
+    try { localStorage.setItem("sabaq-v4-juz-ayahs", JSON.stringify(juzCoverage)); } catch (e) {}
+  }
+  function loadSurahCoverage() {
+    try {
+      var raw = localStorage.getItem("sabaq-v4-surah-ayahs");
+      if (!raw) { return; }
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") { surahCoverage = saved; }
+    } catch (e) {}
+  }
+  function saveSurahCoverage() {
+    try { localStorage.setItem("sabaq-v4-surah-ayahs", JSON.stringify(surahCoverage)); } catch (e) {}
+  }
+  function markCoverage(surah, from, to) {
+    for (var a = from; a <= to; a++) {
+      var j = juzFor(surah, a);
+      if (j) {
+        if (!juzCoverage[j]) { juzCoverage[j] = {}; }
+        juzCoverage[j][surah + ":" + a] = true;
+      }
+      if (!surahCoverage[surah]) { surahCoverage[surah] = {}; }
+      surahCoverage[surah][a] = true;
+    }
+  }
+  function juzAyahCount(j) {
+    if (!quranData) { return 0; }
+    var n = 0;
+    quranData.surahs.forEach(function (s) {
+      s.ayahs.forEach(function (a) { if (a.juz === j) { n++; } });
+    });
+    return n;
+  }
+  function juzFinished(j) {
+    var total = juzAyahCount(j);
+    if (!total) { return false; }
+    var cov = juzCoverage[j] || {};
+    return Object.keys(cov).length >= total;
+  }
+  function finishedJuzList() {
+    var out = [];
+    for (var j = 1; j <= 30; j++) { if (juzFinished(j)) { out.push(j); } }
+    return out;
+  }
+  function surahAyahCount(surahNum) {
+    if (!quranData) { return 0; }
+    var s = getSurah(surahNum);
+    return s ? s.ayahs.length : 0;
+  }
+  function surahFinished(surahNum) {
+    var total = surahAyahCount(surahNum);
+    if (!total) { return false; }
+    var cov = surahCoverage[surahNum] || {};
+    return Object.keys(cov).length >= total;
+  }
+  function finishedSurahList() {
+    var out = [];
+    Object.keys(surahCoverage).forEach(function (k) {
+      var n = parseInt(k, 10);
+      if (surahFinished(n)) { out.push(n); }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+  // Bank XP payouts for finishes: a surah or juz pays out once, on the
+  // day it is finished. Called only from a real completed lesson.
+  function bankXpFinishes(surah, from, to, today) {
+    var changed = false;
+    var hasSurah = false;
+    progressTotals.xpSurahs.forEach(function (e) { if (e.surah === surah) { hasSurah = true; } });
+    if (!hasSurah && surahFinished(surah)) {
+      progressTotals.xpSurahs.push({ surah: surah, date: today });
+      changed = true;
+    }
+    var seenJuz = {};
+    for (var a = from; a <= to; a++) {
+      var j = juzFor(surah, a);
+      if (!j || seenJuz[j]) { continue; }
+      seenJuz[j] = true;
+      var hasJuz = false;
+      progressTotals.xpJuz.forEach(function (e) { if (e.juz === j) { hasJuz = true; } });
+      if (!hasJuz && juzFinished(j)) {
+        progressTotals.xpJuz.push({ juz: j, date: today });
+        changed = true;
+      }
+    }
+    if (changed) { saveTotals(); }
+  }
+
+  /* ---------- Badges (derived, never stored — an earned badge always
+     has the real event behind it in the stores above) ---------- */
+  var BADGE_DEFS = [
+    { id: "first-lesson", icon: "\uD83D\uDCDA", name: "First Lesson", req: "Complete your first lesson" },
+    { id: "streak-3", icon: "\uD83D\uDD25", name: "3-Day Streak", req: "Learn 3 days in a row" },
+    { id: "streak-7", icon: "\uD83D\uDD25", name: "7-Day Streak", req: "Learn 7 days in a row" },
+    { id: "streak-30", icon: "\uD83C\uDFC6", name: "30-Day Streak", req: "Learn 30 days in a row" },
+    { id: "first-diagnostic", icon: "\uD83E\uDDED", name: "First Diagnostic", req: "Finish a diagnostic" },
+    { id: "perfect-lesson", icon: "\u2728", name: "Perfect Lesson", req: "100% of words heard in a lesson" },
+    { id: "words-100", icon: "\uD83D\uDCAF", name: "100 Words Heard", req: "100 words heard in lessons" },
+    { id: "first-juz", icon: "\uD83C\uDF19", name: "First Juz Finished", req: "Cover every ayah of one juz" }
+  ];
+  function computeBadges() {
+    var st = streakStats(todayStr());
+    var perfect = false;
+    lessonLog.forEach(function (e) { if (e.total > 0 && e.heard === e.total) { perfect = true; } });
+    var earned = {
+      "first-lesson": lessonLog.length > 0,
+      "streak-3": st.best >= 3,
+      "streak-7": st.best >= 7,
+      "streak-30": st.best >= 30,
+      "first-diagnostic": progressTotals.diagnostics.length > 0,
+      "perfect-lesson": perfect,
+      "words-100": progressTotals.wordsHeard >= 100,
+      "first-juz": finishedJuzList().length > 0
+    };
+    return BADGE_DEFS.map(function (d) {
+      return { id: d.id, icon: d.icon, name: d.name, req: d.req, earned: !!earned[d.id] };
+    });
+  }
+
+  /* ---------- Weekly analytics (last 7 calendar days, real data only) ---------- */
+  function weeklyAnalytics() {
+    var today = todayStr();
+    var weekStart = addDaysStr(today, -6);
+    var heard = 0, total = 0, lessons = 0;
+    lessonLog.forEach(function (e) {
+      if (e.date >= weekStart && e.date <= today) {
+        heard += e.heard;
+        total += e.total;
+        lessons++;
+      }
+    });
+    return {
+      wordsWeek: heard,
+      lessonsWeek: lessons,
+      accuracy: total > 0 ? Math.round(heard / total * 100) : null,
+      dueCount: getDueItems(today).length,
+      nextDue: getNextDueDate(today)
+    };
+  }
+
+  /* ---------- XP + levels (QuranCast's math, Sabaq's ladder) ----------
+     XP: 50 per completed lesson, 500 per completed surah, 5,000 per
+     completed juz. QuranCast gives the endpoints (Newcomer up to Qari
+     at 10,000 XP); the rungs between are Sabaq's own ladder, built so
+     a lesson-a-day learner levels up every few weeks, not every day.
+     XP is derived from the banked counters above — it can never be
+     paid twice for the same finish, and it is never invented. */
+  var XP_PER_LESSON = 50;
+  var XP_PER_SURAH = 500;
+  var XP_PER_JUZ = 5000;
+  var LEVELS = [
+    { name: "Newcomer", xp: 0 },
+    { name: "Student", xp: 250 },
+    { name: "Learner", xp: 750 },
+    { name: "Reciter", xp: 1500 },
+    { name: "Memorizer", xp: 3000 },
+    { name: "Hafiz", xp: 5000 },
+    { name: "Qari", xp: 10000 }
+  ];
+  function xpTotal() {
+    return XP_PER_LESSON * progressTotals.lessons +
+      XP_PER_SURAH * progressTotals.xpSurahs.length +
+      XP_PER_JUZ * progressTotals.xpJuz.length;
+  }
+  function levelFor(xp) {
+    var cur = LEVELS[0], next = null;
+    LEVELS.forEach(function (l) {
+      if (xp >= l.xp) { cur = l; }
+      else if (!next) { next = l; }
+    });
+    return {
+      name: cur.name,
+      xp: xp,
+      base: cur.xp,
+      next: next,
+      xpToNext: next ? next.xp - xp : 0,
+      // Progress through the current level (0..1); Qari is full.
+      progress: next ? (xp - cur.xp) / (next.xp - cur.xp) : 1
+    };
+  }
+
+  /* ---------- Daily quest: 30 verses or 1 juz (QuranCast's quest) ----
+     The quest is the day's goal, shown on the streak card and on the
+     Today screen. Verses are ayahs covered by lessons completed today
+     (a second take of the same ayahs still counts — it is recitation
+     volume, and it is labelled as such). A juz finished today also
+     completes the quest. The quest is a stretch goal, NOT a gate on
+     the streak: a completed lesson still banks the streak day (the
+     original rule). Gating the streak behind 30 verses would make the
+     3/7/30-day badges unreachable at Beginner level (5 ayahs a day),
+     so the quest stays aspirational — finishing it always banks the
+     day anyway, because it takes completed lessons to get there. */
+  var QUEST_VERSES = 30;
+  function versesToday(today) {
+    var n = 0;
+    lessonLog.forEach(function (e) {
+      if (e.date === today) { n += (e.to - e.from + 1); }
+    });
+    return n;
+  }
+  function questStatus(today) {
+    var verses = versesToday(today);
+    var juzDone = false;
+    progressTotals.xpJuz.forEach(function (e) { if (e.date === today) { juzDone = true; } });
+    return {
+      verses: verses,
+      target: QUEST_VERSES,
+      juzDone: juzDone,
+      done: verses >= QUEST_VERSES || juzDone
+    };
+  }
+
+  /* ---------- Per-lesson tally (the lesson grade) ---------- */
+  // Tallied per ayah as the user leaves it; a retry overwrites that
+  // ayah's tally, so the grade is always the latest take of each ayah.
+  function tallyLessonAyah() {
+    if (!live || liveDiag) { return; }
+    if (!live.lessonStats) { live.lessonStats = { perAyah: {} }; }
+    var heard = 0;
+    live.words.forEach(function (w) {
+      if (w.state === "good" || w.state === "fixed" || w.state === "dismissed") { heard++; }
+    });
+    live.lessonStats.perAyah[live.idx] = { heard: heard, total: live.words.length };
+  }
+  function lessonTotals() {
+    var heard = 0, total = 0;
+    if (live && live.lessonStats) {
+      Object.keys(live.lessonStats.perAyah).forEach(function (k) {
+        var e = live.lessonStats.perAyah[k];
+        heard += e.heard;
+        total += e.total;
+      });
+    }
+    return { heard: heard, total: total };
+  }
+
+  /* ---------- Rendering (v4c sections) ---------- */
+  function renderStreakCard() {
+    var card = el("streakCard");
+    if (!card) { return; }
+    var today = todayStr();
+    var st = streakStats(today);
+    el("streakNum").textContent = String(st.current);
+    el("streakLabel").textContent = st.current === 1 ? "day streak" : "days streak";
+    el("streakBest").textContent = "Best: " + st.best + " day" + (st.best === 1 ? "" : "s");
+    var dots = el("streakDots");
+    dots.innerHTML = "";
+    weekDots(today).forEach(function (d) {
+      var dot = document.createElement("span");
+      dot.className = "streak-dot" + (d.done ? " is-done" : "") + (d.isToday ? " is-today" : "");
+      var c = document.createElement("span");
+      c.className = "dot-circle";
+      dot.appendChild(c);
+      var lbl = document.createElement("span");
+      lbl.textContent = d.label;
+      dot.appendChild(lbl);
+      dots.appendChild(dot);
+    });
+    el("streakNote").textContent = st.current > 0
+      ? (streakDays.indexOf(today) >= 0
+        ? "You learned today — keep it going."
+        : "You did not learn today yet — your streak is waiting.")
+      : "Finish a lesson to start your streak.";
+    var q = questStatus(today);
+    el("streakQuest").textContent = q.done
+      ? "Daily quest done \u2713 — " + (q.juzDone ? "1 juz finished today." : q.verses + " verses today.")
+      : "Daily quest: " + q.verses + " / " + q.target + " verses";
+  }
+  function renderDueSection() {
+    var sec = el("dueSection");
+    if (!sec) { return; }
+    var today = todayStr();
+    var due = getDueItems(today);
+    sec.hidden = due.length === 0;
+    el("dueCount").textContent = String(due.length);
+    var list = el("dueList");
+    list.innerHTML = "";
+    due.forEach(function (d) {
+      var item = document.createElement("div");
+      item.className = "due-item";
+      var info = document.createElement("div");
+      info.className = "due-item-info";
+      var t = document.createElement("div");
+      t.className = "due-item-title";
+      t.textContent = rangeLabel(d);
+      var dt = document.createElement("div");
+      var overdueDays = daysBetween(d.due, today);
+      dt.className = "due-item-date" + (overdueDays > 0 ? " is-overdue" : "");
+      dt.textContent = overdueDays === 0 ? "Due today"
+        : overdueDays === 1 ? "Overdue by 1 day"
+        : "Overdue by " + overdueDays + " days";
+      info.appendChild(t);
+      info.appendChild(dt);
+      var btn = document.createElement("button");
+      btn.className = "due-item-start";
+      btn.type = "button";
+      btn.textContent = "Review \u2192";
+      (function (key) {
+        btn.addEventListener("click", function () { startDueReview(key); });
+      })(sm2Key(d.surah, d.from, d.to));
+      item.appendChild(info);
+      item.appendChild(btn);
+      list.appendChild(item);
+    });
+  }
+  function renderAnalytics() {
+    var a = weeklyAnalytics();
+    var today = todayStr();
+    var st = streakStats(today);
+    el("statWordsWeek").textContent = a.lessonsWeek ? String(a.wordsWeek) : "\u2014";
+    el("statLessonsWeek").textContent = a.lessonsWeek ? String(a.lessonsWeek) : "\u2014";
+    el("statAccuracyWeek").textContent = a.accuracy === null ? "\u2014" : a.accuracy + "%";
+    el("statDueCount").textContent = String(a.dueCount);
+    el("statsNote").textContent = a.lessonsWeek
+      ? "Last 7 days \u00B7 Streak: " + st.current + " day" + (st.current === 1 ? "" : "s") +
+        " (best " + st.best + ") \u00B7 Next review: " +
+        (a.dueCount ? a.dueCount + " due now" :
+          a.nextDue ? fmtShortDate(a.nextDue) : "nothing scheduled") + "."
+      : "No lessons yet this week — your numbers will show here.";
+    // XP + level.
+    var lv = levelFor(xpTotal());
+    el("xpTotal").textContent = lv.xp.toLocaleString("en-US") + " XP";
+    el("xpLevel").textContent = lv.name;
+    el("xpBarFill").style.width = Math.round(lv.progress * 100) + "%";
+    el("xpNext").textContent = lv.next
+      ? lv.xpToNext.toLocaleString("en-US") + " XP to " + lv.next.name
+      : "Qari — the highest level";
+    // Daily quest.
+    var q = questStatus(today);
+    el("questText").textContent = q.done ? "Quest done \u2713" : "Finish 30 verses or 1 juz";
+    el("questBarFill").style.width = Math.min(100, Math.round(q.verses / q.target * 100)) + "%";
+    el("questProgress").textContent = q.juzDone
+      ? "1 juz finished today"
+      : q.verses + " / " + q.target + " verses today";
+  }
+  function renderBadges() {
+    var grid = el("badgeGrid");
+    if (!grid) { return; }
+    grid.innerHTML = "";
+    computeBadges().forEach(function (b) {
+      var card = document.createElement("div");
+      card.className = "badge-card" + (b.earned ? " is-earned" : "");
+      var icon = document.createElement("div");
+      icon.className = "badge-icon";
+      icon.textContent = b.icon;
+      var name = document.createElement("div");
+      name.className = "badge-name";
+      name.textContent = b.name;
+      var req = document.createElement("div");
+      req.className = "badge-req";
+      req.textContent = b.earned ? "Earned \u2713" : b.req;
+      card.appendChild(icon);
+      card.appendChild(name);
+      card.appendChild(req);
+      grid.appendChild(card);
+    });
+  }
+  function startDueReview(key) {
+    var r = sm2[key];
+    if (!r) { return false; }
+    var ok = openLive(r.surah, r.from, r.to, { tier: "manzil" });
+    if (ok) { saveLastPosition(); }
+    return ok;
   }
 
   function loadLessonLevel() {
@@ -2009,14 +2636,24 @@
     return null;
   }
 
-  /* Manzil: rotation of older memorized juz, 1/4 to 1 juz. Rotates daily
-     through the juz that have completed lessons (other than the Sabaq
-     juz); the daily slice is the level length of ayahs from the start of
-     that juz. Null when no older juz exists yet. */
+  /* Manzil: revision of older memorized juz, 1/4 to 1 juz. v4c: due SM-2
+     reviews come FIRST — the most overdue lesson is today's Manzil
+     (other than today's Sabaq range, which is new work, not review).
+     With nothing due, it rotates daily through the juz that have
+     completed lessons (other than the Sabaq juz); the daily slice is the
+     level length of ayahs from the start of that juz. Null when no older
+     juz exists yet. */
   function manzilRange() {
     var sb = sabaqRange();
     if (!sb) { return null; }
     var n = LESSON_LEVELS[lessonLevel].ayahs;
+    var due = getDueItems(todayStr());
+    for (var di = 0; di < due.length; di++) {
+      var d = due[di];
+      if (d.surah === sb.surah && d.from === sb.from && d.to === sb.to) { continue; }
+      return { surah: d.surah, from: d.from, to: d.to, juz: juzFor(d.surah, d.from),
+               due: true, dueDate: d.due };
+    }
     var sbJuz = juzFor(sb.surah, sb.from);
     var juzList = [];
     completedLessons.forEach(function (l) {
@@ -2125,9 +2762,17 @@
       el("tierSabqiStart").disabled = true;
     }
     if (mz) {
-      el("tierManzilTitle").textContent = "Juz " + mz.juz + " · " + rangeLabel(mz);
-      el("tierManzilSub").textContent = (mz.to - mz.from + 1) + " ayah" +
-        (mz.to > mz.from ? "s" : "") + " · " + rangeWordCount(mz.surah, mz.from, mz.to) + " words";
+      if (mz.due) {
+        el("tierManzilTitle").textContent = "Due for review · " + rangeLabel(mz);
+        var overdueDays = daysBetween(mz.dueDate, todayStr());
+        el("tierManzilSub").textContent = (overdueDays === 0 ? "Due today" : overdueDays === 1 ? "Overdue by 1 day" : "Overdue by " + overdueDays + " days") +
+          " · " + (mz.to - mz.from + 1) + " ayah" + (mz.to > mz.from ? "s" : "") + " · " +
+          rangeWordCount(mz.surah, mz.from, mz.to) + " words";
+      } else {
+        el("tierManzilTitle").textContent = "Juz " + mz.juz + " · " + rangeLabel(mz);
+        el("tierManzilSub").textContent = (mz.to - mz.from + 1) + " ayah" +
+          (mz.to > mz.from ? "s" : "") + " · " + rangeWordCount(mz.surah, mz.from, mz.to) + " words";
+      }
       el("tierManzilStart").disabled = false;
     } else {
       el("tierManzilTitle").textContent = "No older revision yet";
@@ -2146,6 +2791,10 @@
           : "No open mistakes yet — recite a lesson first, then come back here.";
       }
     } else if (rnote) { rnote.hidden = true; }
+    // v4c: due list, weekly numbers, badges — all from real history.
+    renderDueSection();
+    renderAnalytics();
+    renderBadges();
   }
 
   function startLesson(tier) {
@@ -2657,6 +3306,11 @@
     if (!ayahs.length) { return false; }
     live = { surah: surahNum, from: from, to: to, ayahs: ayahs, idx: 0, words: [],
              tier: (opts && opts.tier) || null };
+    // v4c: per-ayah heard/total for the lesson grade, plus the
+    // once-only guards for lesson / diagnostic completion.
+    live.lessonStats = { perAyah: {} };
+    live.lessonRecorded = false;
+    live.diagRecorded = false;
     liveResetTake();
     el("liveSummary").hidden = true;
     el("liveHeardLine").hidden = true;
@@ -2939,6 +3593,7 @@
       return;
     }
     if (liveDiag) { tallyLiveAyah(); }
+    else { tallyLessonAyah(); }
     stopLiveListening();
     if (live.idx >= live.ayahs.length - 1) {
       liveGoTo(0);
@@ -2983,12 +3638,14 @@
     }
     // Final pass: flag every missed word, including trailing ones.
     applyLiveAlignment(liveAlign(words, heardWords, true));
+    if (!liveDiag) { tallyLessonAyah(); }
     var result = scoreRecitation(words, heardWords);
     var open = live.words.filter(function (w) { return w.state === "bad"; }).length;
     var heard = liveScore();
     if (liveDiag && isLast) {
       // End of the diagnostic run: the report, not the per-ayah summary.
       tallyLiveAyah();
+      recordDiagnosticCompletion();
       var rep = diagReportText();
       var surah = getSurah(live.surah);
       el("liveSummaryTitle").textContent = rep.title + " — " + (surah ? surah.englishName : "");
@@ -3013,8 +3670,15 @@
     el("liveSummary").scrollIntoView({ behavior: "smooth", block: "start" });
     // Finishing the last ayah of a lesson completes the lesson — the
     // Sabqi / Manzil tiers read this. A diagnostic is a test, not a
-    // lesson, so it is never recorded.
-    if (isLast && !liveDiag) { recordCompletedLesson(live.surah, live.from, live.to); }
+    // lesson, so it is never recorded. Hifz rule (QuranCast's, and
+    // ours): nothing counts until the session is finished — Done on
+    // the last ayah IS the finish, so a half-done lesson (closed or
+    // abandoned mid-range) banks nothing, and the guard below means a
+    // second Done tap can never bank the same lesson twice.
+    if (isLast && !liveDiag && !live.lessonRecorded) {
+      live.lessonRecorded = true;
+      recordCompletedLesson(live.surah, live.from, live.to, lessonTotals());
+    }
   }
 
   function liveTryAgain() {
@@ -3025,6 +3689,8 @@
       w.state = (w.state === "bad") ? "retry" : "pending";
       w.heard = "";
     });
+    // The re-take replaces this ayah's lesson tally (v4c).
+    if (live.lessonStats) { delete live.lessonStats.perAyah[live.idx]; }
     liveHeardText = "";
     el("liveSummary").hidden = true;
     el("liveHeardLine").hidden = true;
@@ -3325,6 +3991,12 @@
     loadCapPrefs();
     loadLessonLevel();
     loadCompletedLessons();
+    loadSM2();
+    loadStreakDays();
+    loadLessonLog();
+    loadTotals();
+    loadJuzCoverage();
+    loadSurahCoverage();
     setCapMode(capMode);
     setCapFont(capFont);
     el("introGuestBtn").addEventListener("click", function () { continueAsGuest(); showScreen("plan"); });
@@ -3476,7 +4148,7 @@
       return {
         surah: live.surah, from: live.from, to: live.to, idx: live.idx,
         ayahRef: live.ayahs[live.idx].ref, total: live.ayahs.length,
-        listening: liveListening, hold: liveHold
+        listening: liveListening, hold: liveHold, tier: live.tier
       };
     },
     getLiveWords: function () {
@@ -3530,6 +4202,98 @@
       completedLessons = [];
       saveCompletedLessons();
       renderLesson();
+    },
+    // v4c hooks: SM-2, streak, badges, analytics, XP, quest (test-only).
+    setToday: function (d) { testToday = d || null; },
+    clearToday: function () { testToday = null; },
+    getToday: function () { return todayStr(); },
+    gradeForAccuracy: gradeForAccuracy,
+    getSM2: function () {
+      return Object.keys(sm2).map(function (k) { return sm2[k]; });
+    },
+    seedSM2: function (list) {
+      sm2 = {};
+      (list || []).forEach(function (r) {
+        if (r && typeof r.surah === "number" && typeof r.from === "number") {
+          sm2[sm2Key(r.surah, r.from, r.to)] = {
+            surah: r.surah, from: r.from, to: r.to,
+            ef: typeof r.ef === "number" ? r.ef : 2.5,
+            interval: r.interval || 0, reps: r.reps || 0,
+            due: r.due || todayStr(), grade: r.grade || null, ts: r.ts || 0
+          };
+        }
+      });
+      saveSM2();
+      renderLesson();
+    },
+    clearSM2: function () { sm2 = {}; saveSM2(); renderLesson(); },
+    getStreak: function () { return streakStats(todayStr()); },
+    getWeekDots: function () { return weekDots(todayStr()); },
+    seedDays: function (days) {
+      streakDays = (days || []).slice().sort();
+      saveStreakDays();
+      renderStreakCard();
+    },
+    getDays: function () { return streakDays.slice(); },
+    getBadges: computeBadges,
+    getAnalytics: weeklyAnalytics,
+    getDueItems: function () { return getDueItems(todayStr()); },
+    getNextDueDate: function () { return getNextDueDate(todayStr()); },
+    getLessonLog: function () { return lessonLog.slice(); },
+    seedLessonLog: function (list) {
+      lessonLog = (list || []).slice(0, 100);
+      saveLessonLog();
+      renderLesson();
+    },
+    getTotals: function () {
+      return { wordsHeard: progressTotals.wordsHeard, lessons: progressTotals.lessons,
+               diagnostics: progressTotals.diagnostics.slice(),
+               xpSurahs: progressTotals.xpSurahs.slice(),
+               xpJuz: progressTotals.xpJuz.slice() };
+    },
+    seedTotals: function (t) {
+      progressTotals = {
+        wordsHeard: (t && t.wordsHeard) || 0,
+        lessons: (t && t.lessons) || 0,
+        diagnostics: (t && t.diagnostics) || [],
+        xpSurahs: (t && t.xpSurahs) || [],
+        xpJuz: (t && t.xpJuz) || []
+      };
+      saveTotals();
+      renderLesson();
+    },
+    getXp: function () { return { total: xpTotal(), level: levelFor(xpTotal()) }; },
+    getQuest: function () { return questStatus(todayStr()); },
+    getJuzCoverage: function () { return juzCoverage; },
+    getSurahCoverage: function () { return surahCoverage; },
+    seedCoverage: function (juzMap, surahMap) {
+      juzCoverage = juzMap || {};
+      surahCoverage = surahMap || {};
+      saveJuzCoverage();
+      saveSurahCoverage();
+      renderLesson();
+    },
+    getJuzAyahRefs: function (j) {
+      var out = [];
+      if (!quranData) { return out; }
+      quranData.surahs.forEach(function (s) {
+        s.ayahs.forEach(function (a) { if (a.juz === j) { out.push(s.number + ":" + a.numberInSurah); } });
+      });
+      return out;
+    },
+    startDueReview: startDueReview,
+    clearAllProgress: function () {
+      sm2 = {}; saveSM2();
+      streakDays = []; saveStreakDays();
+      lessonLog = []; saveLessonLog();
+      progressTotals = { wordsHeard: 0, lessons: 0, diagnostics: [], xpSurahs: [], xpJuz: [] };
+      saveTotals();
+      juzCoverage = {}; saveJuzCoverage();
+      surahCoverage = {}; saveSurahCoverage();
+      completedLessons = []; saveCompletedLessons();
+      testToday = null;
+      renderLesson();
+      renderStreakCard();
     },
     getStoppedAt: function () { return liveStoppedAt; },
     getLiveDiag: function () { return liveDiag; },

@@ -2220,3 +2220,260 @@ button:focus-visible {
   .cap-ar { font-size: 34px; }
   .cap-detail-ar { font-size: 38px; }
 }
+
+/* ================= v4c: SM-2 review + streaks + badges + progress ======
+   Same ink + paper + gold language as v4b. Gold only for Quranic Arabic
+   and earned/accepted things; no green anywhere. */
+
+/* ---------- Streak card (Home + lesson screen) ---------- */
+
+.streak-card {
+  margin: 0 0 14px;
+  padding: 18px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: center;
+}
+
+.streak-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.streak-flame { font-size: 30px; line-height: 1; }
+
+.streak-num {
+  font-family: var(--font-head);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.streak-label { font-size: 18px; font-weight: 800; color: var(--ink); }
+
+.streak-best { margin: 4px 0 12px; color: var(--muted); font-size: 15px; font-weight: 600; }
+
+.streak-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.streak-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.streak-dot .dot-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--paper);
+}
+
+.streak-dot.is-done .dot-circle {
+  background: var(--gold);
+  border-color: var(--gold-dark);
+}
+
+.streak-dot.is-today .dot-circle { border-color: var(--ink); border-width: 2px; }
+
+.streak-note { margin: 0; color: var(--muted); font-size: 15px; }
+
+/* ---------- Due for review ---------- */
+
+.due-section {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: #FBF6EC;
+}
+
+.due-title { margin: 0 0 2px; font-size: 20px; font-weight: 800; color: var(--ink); }
+
+.due-sub { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+
+.due-list { display: grid; gap: 10px; }
+
+.due-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.due-item-info { flex: 1; min-width: 0; }
+
+.due-item-title { font-size: 17px; font-weight: 800; color: var(--ink); }
+
+.due-item-date { color: var(--muted); font-size: 14px; }
+
+.due-item-date.is-overdue { color: var(--red); font-weight: 700; }
+
+.due-item-start {
+  flex: none;
+  min-height: 48px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+/* ---------- This-week stats ---------- */
+
+.stats-section {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.stats-title { margin: 0 0 12px; font-size: 20px; font-weight: 800; color: var(--ink); }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card {
+  padding: 14px 12px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  text-align: center;
+}
+
+.stat-num {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.stat-label { display: block; margin-top: 2px; color: var(--muted); font-size: 14px; font-weight: 600; }
+
+.stats-note { margin: 12px 0 0; color: var(--muted); font-size: 15px; text-align: center; }
+
+/* ---------- Badges ---------- */
+
+.badges-section {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.badge-card {
+  padding: 14px 12px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  text-align: center;
+  opacity: 0.65;
+}
+
+.badge-card.is-earned {
+  opacity: 1;
+  border-color: var(--gold);
+  background: #FBF6EC;
+}
+
+.badge-icon { font-size: 30px; line-height: 1; }
+
+.badge-name { margin-top: 6px; font-size: 16px; font-weight: 800; color: var(--ink); }
+
+.badge-req { margin-top: 2px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+.badge-card.is-earned .badge-req { color: var(--gold-dark); font-weight: 700; }
+
+/* ---------- XP banner + daily quest ---------- */
+
+.xp-banner {
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  background: #FBF6EC;
+}
+
+.xp-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.xp-total {
+  font-family: var(--font-head);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.xp-level {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--gold-dark);
+}
+
+.xp-bar {
+  height: 12px;
+  margin: 10px 0 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.xp-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.xp-next { margin: 0; color: var(--muted); font-size: 15px; }
+
+.quest-card {
+  margin-top: 12px;
+  padding: 14px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.quest-title { margin: 0 0 2px; font-size: 18px; font-weight: 800; color: var(--ink); }
+
+.quest-text { margin: 0; color: var(--muted); font-size: 15px; }
+
+.quest-progress { margin: 6px 0 0; color: var(--ink); font-size: 15px; font-weight: 700; }
+
+.streak-quest { margin: 8px 0 0; color: var(--gold-dark); font-size: 15px; font-weight: 700; }
