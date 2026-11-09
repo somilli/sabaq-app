@@ -6,12 +6,24 @@
    files make every font deterministic. The four Noto Kufi weight files
    are byte-identical (one static file), so a single 400 @font-face
    covers the family. */
+/* v5 audit fix (Nov 8) — the default Uthmani face is Scheherazade New,
+   not Amiri Quran. Amiri Quran's diacritics float detached from the
+   letters in Chrome (dagger alef, shaddah and sukun read as a vertical
+   stack of marks around a narrow word — the lesson's big word card
+   looked broken while Kufi and West African read fine). Side-by-side
+   render test, same words, same size: Scheherazade New attaches every
+   mark to its letter; Amiri Quran and its full (unsubsetted) file
+   render identically loose, so the file was not the problem — the face
+   was. Scheherazade New is SIL OFL, built for Quranic text, and its
+   subset covers every codepoint the app renders (verified against
+   quran.json + words.json + UI strings: 70 glyphs). The "Uthmani"
+   label is the script, not the font file — the text is still Uthmani. */
 @font-face {
-  font-family: "Amiri Quran";
+  font-family: "Scheherazade New";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("fonts/amiri-quran-arabic-400.woff2") format("woff2");
+  src: url("fonts/scheherazade-new-arabic-400.woff2") format("woff2");
   unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
 }
 
@@ -69,9 +81,9 @@
   --red: #C0392B;
   --font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-head: "Newsreader", Georgia, "Times New Roman", serif;
-  --font-arabic: "Amiri Quran", "Traditional Arabic", "Scheherazade", serif;
-  --font-alkalami: "Alkalami", "Amiri Quran", "Traditional Arabic", serif;
-  --font-kufi: "Noto Kufi Arabic", "Amiri Quran", "Traditional Arabic", serif;
+  --font-arabic: "Scheherazade New", "Noto Naskh Arabic", serif;
+  --font-alkalami: "Alkalami", "Scheherazade New", "Noto Naskh Arabic", serif;
+  --font-kufi: "Noto Kufi Arabic", "Scheherazade New", "Noto Naskh Arabic", serif;
   --radius: 20px;
 }
 
@@ -152,7 +164,7 @@ button:focus-visible {
 
 .qiraat-pill {
   flex: none;
-  min-height: 44px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   padding: 0 16px;
@@ -237,7 +249,7 @@ button:focus-visible {
 }
 
 .back-btn {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 14px;
   margin-bottom: 10px;
   border: none;
@@ -246,103 +258,6 @@ button:focus-visible {
   color: var(--ink);
   font-size: 17px;
   font-weight: 700;
-}
-
-/* ---------- Screen 1: mode picker ---------- */
-
-.mode-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-
-.mode-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-height: 128px;
-  padding: 20px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--ink);
-  text-align: left;
-}
-
-.mode-card.is-selected {
-  border-color: var(--gold);
-  background: #F4F2EC;
-}
-
-.mode-icon {
-  display: block;
-  width: 40px;
-  height: 40px;
-  color: var(--ink);
-}
-
-.mode-icon svg { width: 40px; height: 40px; }
-
-.mode-name {
-  font-family: var(--font-head);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.mode-sub {
-  color: var(--muted);
-  font-size: 16px;
-}
-
-/* ---------- Screen 2: Qira'at picker ---------- */
-
-.qiraat-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-
-.qiraat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-height: 128px;
-  padding: 22px 20px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--ink);
-  text-align: left;
-}
-
-.qiraat-card.is-selected {
-  border-color: var(--gold);
-  background: #F4F2EC;
-}
-
-.qiraat-name {
-  font-family: "Amiri Quran", var(--font-arabic);
-  font-size: 30px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-.qiraat-sub {
-  color: var(--muted);
-  font-size: 16px;
-}
-
-.qiraat-note {
-  margin: 20px 0 0;
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: #F1EFE8;
-  color: var(--ink);
-  font-size: 16px;
-  line-height: 1.5;
 }
 
 /* ---------- Screen 3: time picker + split ---------- */
@@ -410,66 +325,6 @@ button:focus-visible {
   text-align: right;
   font-size: 16px;
   font-weight: 700;
-}
-
-/* ---------- Screen 4: daily loop ---------- */
-
-.task-list {
-  display: grid;
-  gap: 14px;
-}
-
-.task-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-height: 120px;
-  padding: 20px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--ink);
-  text-align: left;
-}
-
-.task-card.is-done {
-  border-color: var(--success);
-  background: #F4F1E6;
-}
-
-.task-kind {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--gold-dark);
-}
-
-.task-title {
-  font-family: var(--font-head);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.task-sub {
-  color: var(--muted);
-  font-size: 16px;
-}
-
-.task-min {
-  margin-top: 6px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.task-done {
-  margin-top: 6px;
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--success);
 }
 
 /* ---------- Practice check (live listening) ---------- */
@@ -681,71 +536,6 @@ button:focus-visible {
   color: var(--muted);
 }
 
-/* ---------- Screen 5: parent dashboard ---------- */
-
-.sample-badge {
-  display: inline-block;
-  margin: 0 0 16px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--gold);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.child-card {
-  margin-bottom: 16px;
-  padding: 20px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-}
-
-.child-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.child-name {
-  font-family: var(--font-head);
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.child-age {
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.child-line {
-  margin: 6px 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.child-card .bar { margin: 12px 0; }
-
-.child-note {
-  margin: 6px 0;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-.child-btn { margin-top: 16px; }
-
-.weekly-note {
-  margin: 20px 0 0;
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: #F1EFE8;
-  font-size: 16px;
-  line-height: 1.5;
-}
-
 /* ---------- Footer + bottom nav ---------- */
 
 .app-footer {
@@ -815,15 +605,18 @@ button:focus-visible {
 /* ---------- v2: live listening ---------- */
 
 /* v4b: the mic is ink — gold is reserved for Quranic Arabic and
-   accepted words. */
+   accepted words.
+   v5 audit fix (Nov 8) — the 🎙️ emoji crowded the "Tap and recite"
+   label: the label wrapped to two lines inside the 88px circle and sat
+   against the emoji. Bigger circle, smaller emoji, one-line label. */
 .mic-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 88px;
-  height: 88px;
+  gap: 2px;
+  width: 96px;
+  height: 96px;
   margin: 18px auto 0;
   border: none;
   border-radius: 50%;
@@ -847,9 +640,9 @@ button:focus-visible {
   100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
 }
 
-.mic-icon { font-size: 34px; line-height: 1; }
+.mic-icon { font-size: 30px; line-height: 1; }
 
-.mic-text { font-size: 13px; font-weight: 800; }
+.mic-text { font-size: 12px; font-weight: 800; white-space: nowrap; }
 
 .practice-progress {
   margin: 0 0 6px;
@@ -1035,33 +828,6 @@ button:focus-visible {
   color: var(--ink);
 }
 
-.ayah-list { display: grid; gap: 4px; }
-
-.ayah-row {
-  display: block;
-  width: 100%;
-  padding: 14px 14px;
-  border: none;
-  border-radius: 16px;
-  background: transparent;
-  color: var(--ink);
-  text-align: right;
-  cursor: pointer;
-}
-
-.ayah-row.is-playing {
-  background: #F3EFE6;
-  outline: 2px solid var(--gold);
-}
-
-.ayah-text {
-  font-family: var(--font-arabic);
-  font-size: var(--read-font-size, 30px);
-  line-height: 2;
-  text-align: right;
-  direction: rtl;
-}
-
 .ayah-end {
   display: inline-block;
   min-width: 34px;
@@ -1102,7 +868,7 @@ button:focus-visible {
 
 .ayah-audio-error .fallback-btn {
   display: inline-block;
-  min-height: 44px;
+  min-height: 48px;
   margin-top: 8px;
   padding: 0 16px;
   border: none;
@@ -1117,7 +883,8 @@ button:focus-visible {
   margin: 12px 0;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #F1EFE8;
+  border: 2px solid var(--line);
+  background: var(--card);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -1131,15 +898,15 @@ button:focus-visible {
   display: flex;
   gap: 8px;
   margin-top: 20px;
-  padding: 10px;
+  padding: 8px;
   border-radius: 18px;
   background: var(--ink);
-  box-shadow: 0 4px 18px rgba(11, 61, 46, 0.35);
+  box-shadow: 0 4px 18px rgba(27, 27, 24, 0.35);
 }
 
 .toolbar-btn {
   flex: 1;
-  min-height: 52px;
+  min-height: 48px;
   border: none;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.1);
@@ -1247,7 +1014,7 @@ button:focus-visible {
 
 .reciter-row.is-selected {
   border-color: var(--gold);
-  background: #F4F2EC;
+  background: var(--card);
 }
 
 .reciter-avatar {
@@ -1333,7 +1100,7 @@ button:focus-visible {
   z-index: 25;
   background: #fff;
   border-top: 2px solid var(--gold);
-  box-shadow: 0 -4px 18px rgba(11, 61, 46, 0.18);
+  box-shadow: 0 -4px 18px rgba(27, 27, 24, 0.18);
 }
 
 .playback-inner {
@@ -1412,68 +1179,6 @@ button:focus-visible {
 
 /* Diagnostic entry on Home */
 
-.diag-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-  min-height: 128px;
-  margin-bottom: 14px;
-  padding: 20px;
-  border: 2px solid var(--gold);
-  border-radius: var(--radius);
-  background: #F4F2EC;
-  color: var(--ink);
-  text-align: left;
-}
-
-.diag-kicker {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--gold-dark);
-}
-
-.diag-title {
-  font-family: var(--font-head);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.diag-sub {
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.account-line {
-  margin: 0 0 4px;
-  color: var(--muted);
-  font-size: 15px;
-  text-align: center;
-}
-
-/* Learning choice on the daily plan */
-
-.learning-line {
-  margin: 0 0 16px;
-  font-size: 17px;
-}
-
-.link-btn {
-  border: none;
-  background: transparent;
-  padding: 0;
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .learn-surah-btn { margin: 14px 0 4px; }
 
 /* Juz map tiles are now tappable buttons */
@@ -1489,27 +1194,6 @@ button:focus-visible {
 
 /* Diagnostic result card */
 
-.diag-result {
-  margin-top: 22px;
-  padding: 22px 18px;
-  border: 2px solid var(--gold);
-  border-radius: var(--radius);
-  background: #FDFCF8;
-}
-
-.diag-level {
-  margin: 0 0 8px;
-  font-family: var(--font-head);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.diag-start {
-  margin: 0 0 6px;
-  font-size: 17px;
-  line-height: 1.5;
-}
 
 /* Account sheet (bottom sheet, no backend) */
 
@@ -1520,7 +1204,7 @@ button:focus-visible {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(11, 61, 46, 0.55);
+  background: rgba(27, 27, 24, 0.55);
 }
 
 .sheet {
@@ -1531,18 +1215,27 @@ button:focus-visible {
   padding: 26px 20px 20px;
   border-radius: 24px;
   background: #fff;
-  box-shadow: 0 12px 40px rgba(11, 61, 46, 0.35);
+  box-shadow: 0 12px 40px rgba(27, 27, 24, 0.35);
+  /* v5 audit fix (Nov 8) — a long sheet (reciter picker) grew taller
+     than the viewport and its Close × scrolled off-screen with no way
+     back. The sheet now scrolls inside itself and the close stays put. */
+  max-height: calc(100vh - 140px);
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sheet-close {
-  position: absolute;
-  top: 10px;
-  right: 14px;
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  display: block;
+  margin-left: auto;
   width: 44px;
   height: 44px;
   border: none;
   border-radius: 50%;
-  background: transparent;
+  background: #fff;
   color: var(--muted);
   font-size: 26px;
   line-height: 1;
@@ -1566,7 +1259,8 @@ button:focus-visible {
   margin: 0 0 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #F4F1E8;
+  border: 2px solid var(--line);
+  background: var(--card);
   color: var(--ink);
   font-size: 16px;
   line-height: 1.5;
@@ -1579,14 +1273,18 @@ button:focus-visible {
 
 /* ---------- v3: live feedback mode ---------- */
 
+/* v5 audit fix (Nov 8) — the honest line is small text under the mic
+   (spec §5.1), not a grey box at the top of the stage. The box pushed
+   the caption, the word card and the mic below the fold. */
 .live-honest {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #F1EFE8;
-  color: var(--ink);
-  font-size: 15px;
+  margin: 14px 0 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
   line-height: 1.5;
+  text-align: center;
 }
 
 .live-range {
@@ -1652,7 +1350,7 @@ button:focus-visible {
   -webkit-tap-highlight-color: transparent;
 }
 
-.lf-word.is-current { background: #F1EFE8; }
+.lf-word.is-current { background: var(--card); outline: 2px solid var(--gold); }
 
 .lf-word.is-good { color: var(--gold); font-weight: 700; }
 
@@ -1790,14 +1488,22 @@ button:focus-visible {
 
 .live-mistake-x {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border: none;
   border-radius: 50%;
   background: var(--line);
   color: var(--ink);
   font-size: 18px;
   font-weight: 700;
+  /* v5 audit fix (Nov 8) — the × is a text glyph inside a span: without
+     centering it sat at the left edge of its grey circle, overlapping
+     the "Needs work" label. Centre it in the circle. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-align: center;
 }
 
 @media (min-width: 560px) {
@@ -1811,11 +1517,15 @@ button:focus-visible {
 
 /* ---------- Intro: the Basmala ---------- */
 
-#screen-intro { text-align: center; padding-top: 6vh; }
+#screen-intro { text-align: center; padding-top: 6vh; overflow-x: hidden; }
 
 .intro-basmala {
   margin: 0 0 2px;
-  font-family: var(--font-alkalami);
+  /* v5 audit fix (Nov 8) — the Basmala was set in Alkalami, whose loose
+     diacritics made the phrase read scattered next to the crisp English
+     line. The default Arabic face (Scheherazade New) attaches every
+     mark, so the Basmala reads as one phrase. */
+  font-family: var(--font-arabic);
   font-size: clamp(30px, 7.2vw, 46px);
   line-height: 2.1;
   color: var(--ink);
@@ -1865,32 +1575,6 @@ button:focus-visible {
 
 .intro-guest { margin-top: 22px; }
 
-/* ---------- Plan picker ---------- */
-
-.plan-grid { display: grid; gap: 12px; margin-top: 16px; }
-
-.plan-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-height: 112px;
-  padding: 18px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-  text-align: left;
-  color: var(--ink);
-}
-
-.plan-card:active { border-color: var(--gold); }
-
-.plan-icon { font-size: 30px; line-height: 1; }
-
-.plan-name { font-size: 19px; font-weight: 800; }
-
-.plan-sub { font-size: 15px; color: var(--muted); }
-
 /* ---------- Lesson: level + three tiers ---------- */
 
 .lesson-level {
@@ -1904,7 +1588,7 @@ button:focus-visible {
 .lesson-level-label { font-weight: 800; }
 
 .level-btn {
-  min-height: 44px;
+  min-height: 48px;
   padding: 8px 12px;
   border: 2px solid var(--line);
   border-radius: 12px;
@@ -2054,7 +1738,7 @@ button:focus-visible {
    tests and the detail strip read them from there); they are hidden
    in the line itself.
    OVERLAP FIX (v4 bug): the Arabic span is a block with line-height
-   2.1, so Amiri's tall diacritics and descenders stay inside their
+   2.1, so the tall diacritics and descenders stay inside their
    own line box and can never paint over the gloss underneath. */
 .live-verse.cap-line {
   display: block;
@@ -2116,7 +1800,7 @@ button:focus-visible {
   padding-bottom: 2px;
 }
 
-/* Quran font picker: Uthmani (Amiri Quran) / West African (Alkalami) /
+/* Quran font picker: Uthmani (Scheherazade New) / West African (Alkalami) /
    Kufic (Noto Kufi Arabic) — applies to the caption words. */
 #screen-live[data-capfont="alkalami"] .cap-ar { font-family: var(--font-alkalami); }
 
@@ -2189,7 +1873,7 @@ button:focus-visible {
    Accepted words are deep gold — readable on paper, and gold is
    reserved for Quranic Arabic + accepted words. Colour alone marks
    the state; no fake-bold on Quranic text. */
-.cap-word.is-current { background: #F1EFE8; }
+.cap-word.is-current { background: var(--card); outline: 2px solid var(--gold); }
 
 .cap-word.is-good .cap-ar { color: var(--gold-dark); }
 
@@ -2214,17 +1898,16 @@ button:focus-visible {
 .diag-report {
   margin-top: 12px;
   padding: 14px;
-  border: 2px solid var(--gold);
+  border: 2px solid var(--line);
   border-radius: 16px;
-  background: #F1EFE8;
+  background: var(--card);
 }
 
 .diag-report-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
 
-.diag-report-line { margin: 4px 0 0; }
+.diag-report-line { margin: 4px 0 0; white-space: pre-line; }
 
 @media (min-width: 560px) {
-  .plan-grid { grid-template-columns: 1fr 1fr; }
   .cap-ar { font-size: 34px; }
   .cap-detail-ar { font-size: 38px; }
 }
@@ -2301,17 +1984,8 @@ button:focus-visible {
 
 /* ---------- Due for review ---------- */
 
-.due-section {
-  margin: 0 0 14px;
-  padding: 16px;
-  border: 2px solid var(--gold);
-  border-radius: var(--radius);
-  background: #FBF6EC;
-}
 
-.due-title { margin: 0 0 2px; font-size: 20px; font-weight: 800; color: var(--ink); }
 
-.due-sub { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
 
 .due-list { display: grid; gap: 10px; }
 
@@ -2359,7 +2033,7 @@ button:focus-visible {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 }
 
@@ -2411,8 +2085,9 @@ button:focus-visible {
 
 .badge-card.is-earned {
   opacity: 1;
-  border-color: var(--gold);
-  background: #FBF6EC;
+  border-color: var(--line);
+  border-left: 4px solid var(--gold);
+  background: var(--card);
 }
 
 .badge-icon { font-size: 30px; line-height: 1; }
@@ -2428,9 +2103,10 @@ button:focus-visible {
 .xp-banner {
   margin: 0 0 12px;
   padding: 14px;
-  border: 2px solid var(--gold);
+  border: 2px solid var(--line);
+  border-left: 4px solid var(--gold);
   border-radius: 16px;
-  background: #FBF6EC;
+  background: var(--card);
 }
 
 .xp-line {
@@ -2540,16 +2216,17 @@ body.stage-open .app { padding-bottom: 32px; }
 .quest-card.is-done { border-left: 4px solid var(--gold); }
 
 /* --- Due strip (spec §4.4): a slim row, not a card --- */
+/* Slim row, NOT a fourth card (spec §4.4) */
 .due-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin: 16px 0 0;
-  padding: 12px 16px;
-  border: 2px solid var(--amber);
-  border-radius: 16px;
-  background: #fff;
+  padding: 4px 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .due-strip-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
 .due-strip-btn { flex: none; width: auto; margin-top: 0; min-height: 48px; }
@@ -2558,7 +2235,7 @@ body.stage-open .app { padding-bottom: 32px; }
 /* --- Tier cards: ring + done state (spec §4.3) --- */
 .tier-card.is-done { border-left: 4px solid var(--gold); }
 .tier-ring { float: right; margin: 0 0 8px 12px; }
-.tier-start:disabled { opacity: 1; color: var(--gold-dark); border-color: var(--gold); background: #FBF7EC; }
+.tier-start:disabled { opacity: 1; color: var(--gold-dark); border-color: var(--gold); background: var(--card); }
 
 /* --- Today settings row (spec §4.5) --- */
 .today-settings { margin: 24px 0 0; }
@@ -2619,13 +2296,18 @@ body.stage-open .app { padding-bottom: 32px; }
   line-height: 2;
   text-align: justify;
   margin: 16px 0 24px;
+  /* v5 audit fix (Nov 8) — the sticky reading toolbar sits over the
+     bottom of the page; without clearance the last ayahs scroll
+     underneath it and read as covered. This padding lets every ayah
+     scroll fully above the toolbar. */
+  padding-bottom: 110px;
 }
 .mushaf-flow[data-readfont="alkalami"] { font-family: var(--font-alkalami); }
 .mushaf-flow[data-readfont="kufi"] { font-family: var(--font-kufi); }
 .flow-ayah { cursor: pointer; border-radius: 12px; padding: 2px 4px; }
-.flow-ayah.is-playing { background: #F3EFE6; outline: 2px solid var(--gold); }
+.flow-ayah.is-playing { background: var(--card); outline: 2px solid var(--gold); }
 .flow-word { padding: 0 3px; border-radius: 6px; }
-.flow-word:hover { background: #F1EFE8; }
+.flow-word:hover { outline: 1px solid var(--gold); }
 .mushaf-flow .ayah-translit {
   display: block;
   margin: 2px 0 10px;
@@ -2712,7 +2394,6 @@ body.stage-open .app { padding-bottom: 32px; }
   border-radius: var(--radius);
   background: var(--card);
 }
-.stage-card.is-current { border-left: 4px solid var(--gold); }
 .stage-card.is-passed { border-left: 4px solid var(--gold); }
 .stage-card.is-locked { opacity: 0.6; }
 .stage-kicker { margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--gold-dark); }
@@ -2752,7 +2433,7 @@ body.stage-open .app { padding-bottom: 32px; }
 .stage-qiraat { flex: none; display: inline-flex; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
 .stage-topbar .live-ayah { flex: 1; min-width: 0; margin: 0; }
 .stage-qiraat-btn {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 12px;
   border: none;
   background: transparent;
@@ -2760,7 +2441,9 @@ body.stage-open .app { padding-bottom: 32px; }
   font-weight: 700;
 }
 .stage-qiraat-btn.is-on { background: var(--ink); color: var(--paper); }
-.live-honest { font-size: 15px; color: var(--muted); margin: 0 0 16px; }
+/* Honest line sits under the mic (moved in the DOM, Nov 8 audit fix):
+   space above it, space below it before the hold toggle. */
+.live-honest { margin: 14px 0 16px; }
 
 /* --- Recap (spec §5.2) --- */
 #screen-live.show-recap .live-range,

@@ -73,6 +73,11 @@
     <div class="placement-links">
       <button class="link-btn" type="button" id="placementShorterBtn">Too hard &mdash; give me a shorter one</button>
       <button class="link-btn" type="button" id="placementNoReadBtn">I can&rsquo;t read Arabic yet</button>
+      <!-- v5 audit fix (Nov 8): a reader whose mic is blocked had no
+           route at all — both links above still need the mic (or start
+           at the alphabet). This one places by hand: pick a surah, no
+           mic needed. -->
+      <button class="link-btn" type="button" id="placementChooseBtn">I can read &mdash; let me choose where to start</button>
     </div>
     <div class="placement-result" id="placementResult" hidden>
       <p class="placement-result-text" id="placementResultText"></p>
@@ -86,7 +91,6 @@
       <div class="today-header-block">
         <span class="today-header-big"><span aria-hidden="true">&#128293;</span> <span id="streakNum">0</span></span>
         <span class="today-header-sub" id="streakLabel">day streak</span>
-        <span class="today-header-sub" id="streakBest">Best: 0 days</span>
       </div>
       <div class="today-header-block today-header-right">
         <span class="today-header-big" id="todayXpTotal">0 XP</span>
@@ -94,7 +98,6 @@
       </div>
     </div>
     <div class="xp-bar today-xp-bar"><span class="xp-bar-fill" id="todayXpBarFill" style="width:0%"></span></div>
-    <p class="today-quest-line" id="streakQuest">Daily quest: 0 / 30 verses</p>
 
     <!-- v5: daily quest card -->
     <div class="quest-card" id="questCard">
@@ -109,7 +112,6 @@
         <p class="quest-text" id="questText">Finish 30 verses or 1 juz</p>
       </div>
       <p class="quest-sub" id="questSub">Verses = ayahs covered by lessons you finish today.</p>
-      <p class="quest-progress" id="questProgress">0 / 30 verses today</p>
     </div>
 
     <!-- v5: due strip — only renders when something is due -->
@@ -124,6 +126,14 @@
       <p class="tier-kicker">Your path</p>
       <p class="tier-title" id="beginnerCardTitle">Stage 1 &middot; Arabic Alphabet</p>
       <p class="tier-sub" id="beginnerCardSub">Practice: Al-Ikhlas 1&ndash;4 &middot; 4 ayahs</p>
+      <!-- v5 audit fix (Nov 8): progress ring, stages passed / 29 (spec §4.6) -->
+      <div class="tier-ring">
+        <svg class="ring" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <circle class="ring-track" cx="32" cy="32" r="26"></circle>
+          <circle class="ring-fill" id="beginnerRingFill" cx="32" cy="32" r="26"></circle>
+          <text class="ring-num" id="beginnerRingNum" x="32" y="37" text-anchor="middle">0 / 29</text>
+        </svg>
+      </div>
       <button class="primary-btn tier-start" type="button" id="beginnerCardBtn">Continue Stage 1 &rarr;</button>
       <button class="link-btn" type="button" id="beginnerPathLink">See all 29 stages &rarr;</button>
     </div>
@@ -188,7 +198,7 @@
         </span>
         <span class="time-split" id="timeSplit">Sabaq <span id="minSabaq">18 min</span> &middot; Sabqi <span id="minSabqi">15 min</span> &middot; Manzil <span id="minManzil">12 min</span></span>
       </div>
-      <button class="link-btn" type="button" id="chooseLink">Choose a different surah or juz &rarr;</button>
+      <button class="link-btn" type="button" id="chooseLink">Choose a different surah &rarr;</button>
       <button class="link-btn" type="button" id="lessonDiagnosticBtn">Run a diagnostic on this surah</button>
     </div>
   </section>
@@ -253,22 +263,19 @@
     <div class="stats-section" id="statsSection">
       <p class="stats-title">This week</p>
       <div class="week-chart" id="weekChart" aria-label="Words heard per day, last 7 days"></div>
+      <!-- Three numbers in a row (spec §7.4): lessons, heard %, due now -->
       <div class="stats-grid">
         <div class="stat-card">
-          <span class="stat-num" id="statWordsWeek">&mdash;</span>
-          <span class="stat-label">Words heard</span>
-        </div>
-        <div class="stat-card">
           <span class="stat-num" id="statLessonsWeek">&mdash;</span>
-          <span class="stat-label">Lessons done</span>
+          <span class="stat-label">Lessons this week</span>
         </div>
         <div class="stat-card">
           <span class="stat-num" id="statAccuracyWeek">&mdash;</span>
-          <span class="stat-label">Accuracy</span>
+          <span class="stat-label">Heard this week</span>
         </div>
         <div class="stat-card">
           <span class="stat-num" id="statDueCount">&mdash;</span>
-          <span class="stat-label">Due for review</span>
+          <span class="stat-label">Due now</span>
         </div>
       </div>
       <p class="stats-note" id="statsNote">Nothing yet — finish a lesson and your week shows here.</p>
@@ -321,7 +328,6 @@
         <button type="button" class="stage-qiraat-btn" data-qiraat-mini="warsh">Warsh</button>
       </span>
     </div>
-    <p class="live-honest">Word check only — it does not check tajweed. The ear can mishear, so a red word is a question, not a verdict. Tap a red word to see what it heard, or dismiss the flag.</p>
 
     <div class="live-range">
       <p class="live-surah" id="liveSurahLine">Al-Fatiha</p>
@@ -367,6 +373,10 @@
       <span class="mic-icon" aria-hidden="true">&#127908;</span>
       <span class="mic-text" id="liveMicBtnText">Tap and recite</span>
     </button>
+    <!-- Honest line: small, under the mic (spec §5.1) — moved here Nov 8;
+         at the top of the stage it was a grey box that pushed the caption,
+         the word card and the mic below the fold. -->
+    <p class="live-honest">Word check only — it does not check tajweed. The ear can mishear, so a red word is a question, not a verdict. Tap a red word to see what it heard, or dismiss the flag.</p>
     <p class="ear-line" id="liveEarLine" hidden></p>
     <p class="practice-status" id="liveStatus" aria-live="polite"></p>
     <p class="heard-line interim" id="liveInterimLine" hidden><strong>Listening&hellip;</strong> <span id="liveInterimText"></span></p>
@@ -423,7 +433,7 @@
 
 <footer class="app-footer" id="appFooter">
   <p>Sabaq &middot; $60/month &mdash; all access &middot; 3 months free at launch</p>
-  <p class="footer-note">Live listening (beta) works in Chrome or Edge and needs internet. It hears words, not perfect tajweed.</p>
+  <p class="footer-note">Live listening (beta) needs Chrome or Edge and internet. It hears words, not perfect tajweed.</p>
 </footer>
 
 <!-- Playback bar (shown while audio is playing) -->
@@ -460,11 +470,14 @@
 
 <!-- ============ SHEETS (v5: the only overlay pattern) ============ -->
 
-<!-- "Choose" sheet — surah/juz/ayah picker (was the plan screen) -->
+<!-- "Choose" sheet — surah/ayah picker (was the plan screen).
+     v5 audit fix (Nov 8): the title promised "a surah or juz" but the
+     juz field is hidden (v5 has no juz plan — planKind is always
+     "surah"), so the title now says what the sheet does. -->
 <div class="sheet-overlay" id="chooseSheet" hidden>
-  <div class="sheet" role="dialog" aria-modal="true" aria-label="Choose a surah or juz">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Choose a surah">
     <button class="sheet-close" id="chooseSheetClose" type="button" aria-label="Close">&times;</button>
-    <h2 class="sheet-title">Choose a surah or juz</h2>
+    <h2 class="sheet-title">Choose a surah</h2>
     <div class="lesson-picker" id="lessonPicker">
       <div class="lesson-field" id="lessonSurahField">
         <label for="lessonSurahSelect">Surah</label>

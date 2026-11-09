@@ -611,7 +611,15 @@
     forEach(list.querySelectorAll(".flow-ayah"), function (b) {
       b.addEventListener("click", function () {
         var idx = parseInt(b.getAttribute("data-ayah-index"), 10);
-        playAyah(state.currentSurah, idx, { continuous: false });
+        /* v5 audit fix (Nov 8) — spec §6.1: tap an ayah → it plays and
+           playback continues ayah to ayah; tap the playing ayah again
+           → pause. The tap used to restart the ayah with continuous
+           off, so it never continued and could never be paused. */
+        if (player.playing && player.surah === state.currentSurah && player.ayahIndex === idx) {
+          pauseAudio();
+        } else {
+          playAyah(state.currentSurah, idx, { continuous: true });
+        }
       });
     });
     forEach(list.querySelectorAll(".flow-word"), function (w) {
@@ -1158,6 +1166,20 @@
     try { localStorage.setItem("sabaq-v4-last", JSON.stringify(lastPosition)); } catch (e) {}
   }
 
+  /* v5 audit fix (Nov 8) — placement used to seed the Sabaq start only
+     in the picker inputs, which nothing persists: on reload the tier
+     reverted to Al-Fatiha (and a retake lost to the stale last
+     position). A placed start IS a resume point, so it is written to
+     the same last-position key a finished lesson writes — the newest
+     placement always wins. */
+  function persistPlacementStart(surahNum, from, to) {
+    lastPosition = {
+      plan: planKind, surah: surahNum, from: from, to: to,
+      ayah: from, ts: Date.now()
+    };
+    try { localStorage.setItem("sabaq-v4-last", JSON.stringify(lastPosition)); } catch (e) {}
+  }
+
   /* Word data for one ayah: [[form, gloss|null, pos, [subtags]], ...].
      Falls back to the verse text (Arabic only) when words.json is missing
      or has no entry for the ayah. */
@@ -1206,16 +1228,25 @@
     var note = el("capModeNote");
     if (note) { note.textContent = CAP_MODES[mode]; }
     // Diagnostic runs a whole surah from start to finish: switching into
-    // it expands the live range to the full surah. Switching out keeps
-    // the range as it is.
+    // it expands the live range to the full surah. Switching out restores
+    // the range the user had before (v5 audit fix, Nov 8 — it used to
+    // keep the full-surah range, silently losing the chosen To ayah).
     if (mode === "diagnostic" && live && !liveDiag) {
       var surah = getSurah(live.surah);
       if (surah) {
+        diagPrevRange = { from: live.from, to: live.to };
         openLive(live.surah, 1, surah.ayahs.length, { tier: "diagnostic", diagnostic: true });
         return;
       }
     }
-    if (wasDiag && mode !== "diagnostic" && live && liveDiag) { liveDiag = false; liveDiagStats = null; }
+    if (wasDiag && mode !== "diagnostic" && live && liveDiag) {
+      liveDiag = false; liveDiagStats = null;
+      if (diagPrevRange) {
+        var prev = diagPrevRange; diagPrevRange = null;
+        openLive(live.surah, prev.from, prev.to, { tier: "sabaq" });
+        return;
+      }
+    }
     if (live) { renderLiveAyah(); }
   }
 
@@ -1837,18 +1868,18 @@
     var today = todayStr();
     var st = streakStats(today);
     setTxt("streakNum", String(st.current));
-    setTxt("streakLabel", st.current === 1 ? "day streak" : "days streak");
-    setTxt("streakBest", "Best: " + st.best + " day" + (st.best === 1 ? "" : "s"));
+    /* v5 audit fix (Nov 8): spec §4.1 says "day streak" (no plural, no
+       "Best:" line — the best streak is already in the parent view).
+       The quest count lived here too ("Daily quest: N / 30 verses") on
+       top of the quest card's own ring + text — removed, the card
+       carries it once. */
+    setTxt("streakLabel", "day streak");
     var lv = levelFor(xpTotal());
     setTxt("todayXpTotal", lv.xp.toLocaleString("en-US") + " XP");
     setTxt("todayXpLevel", lv.next
       ? lv.name + " \u00B7 " + lv.xpToNext.toLocaleString("en-US") + " XP to " + lv.next.name
       : lv.name + " \u00B7 the highest level");
     setFill("todayXpBarFill", lv.progress * 100);
-    var q = questStatus(today);
-    setTxt("streakQuest", q.done
-      ? "Daily quest done \u2713 — " + (q.juzDone ? "1 juz finished today." : q.verses + " verses today.")
-      : "Daily quest: " + q.verses + " / " + q.target + " verses");
   }
   function renderDueSection() {
     var sec = el("dueSection");
@@ -1892,7 +1923,10 @@
     var a = weeklyAnalytics();
     var today = todayStr();
     var st = streakStats(today);
-    setTxt("statWordsWeek", a.lessonsWeek ? String(a.wordsWeek) : "\u2014");
+    /* v5 audit fix (Nov 8): Progress shows three numbers in a row
+       (spec §7.4) — lessons, heard %, due now. The "Words heard" card
+       is gone from the page; its count still feeds the chart + parent
+       view, so nothing is lost. */
     setTxt("statLessonsWeek", a.lessonsWeek ? String(a.lessonsWeek) : "\u2014");
     setTxt("statAccuracyWeek", a.accuracy === null ? "\u2014" : a.accuracy + "%");
     setTxt("statDueCount", String(a.dueCount));
@@ -1913,13 +1947,15 @@
     // Daily quest (ring + title + sub, spec §4.2 / §9.2).
     var q = questStatus(today);
     setTxt("questTitle", q.done ? "Quest done \u2713" : "30 verses or 1 juz");
-    setTxt("questSub", q.done ? "30 verses. See you tomorrow."
+    /* v5 audit fix (Nov 8): the done sub used to say "30 verses" even
+       when the quest was completed by finishing a juz. The ring + text
+       carry the count now — the old bottom "N / 30 verses today" line
+       is gone from the page. */
+    setTxt("questSub", q.done
+      ? (q.juzDone ? "1 juz finished. See you tomorrow." : "30 verses. See you tomorrow.")
       : "Verses = ayahs covered by lessons you finish today.");
     setTxt("questText", q.juzDone ? "1 juz finished today" : q.verses + " verses today");
     setFill("questBarFill", Math.min(100, q.verses / q.target * 100));
-    setTxt("questProgress", q.juzDone
-      ? "1 juz finished today"
-      : q.verses + " / " + q.target + " verses today");
     setRing("questRingFill", "questRingNum", Math.min(q.verses, q.target), q.target);
     // Spec §4.2: the ring's number is the fraction ("12 / 30"), not the count.
     setTxt("questRingNum", q.verses + " / " + q.target);
@@ -1993,6 +2029,15 @@
         (d0.due === today ? "today" : d0.due === addDaysStr(today, 1) ? "tomorrow" : fmtShortDate(d0.due)) + ".");
     } else if (nextDue) {
       parts.push("Due next: review " + (nextDue === addDaysStr(today, 1) ? "tomorrow" : fmtShortDate(nextDue)) + ".");
+    }
+    /* v5 audit fix (Nov 8) — the parent card used to say "No practice
+       yet" while "Words to fix" listed flagged words, because the card
+       only counts finished lessons. Flagged words ARE practice on this
+       device, so say so instead of contradicting the fix list. */
+    var openMistakes = 0;
+    liveMistakes.forEach(function (m) { if (m.status === "open") { openMistakes++; } });
+    if (openMistakes > 0) {
+      parts.push(openMistakes + " word" + (openMistakes === 1 ? "" : "s") + " to fix from practice.");
     }
     body.textContent = parts.length
       ? parts.join(" ")
@@ -2335,7 +2380,9 @@
         el("tierManzilSub").textContent = (overdueDays === 0 ? "Due today" : overdueDays === 1 ? "Overdue by 1 day" : "Overdue by " + overdueDays + " days") +
           " · " + split[2] + " min";
       } else {
-        el("tierManzilTitle").textContent = "Juz " + mz.juz + " · " + rangeLabel(mz);
+        /* Spec §4.3: the rotating Manzil slice is titled like
+           "Al-Mulk 1–12 · keep it fresh". */
+        el("tierManzilTitle").textContent = rangeLabel(mz) + " · keep it fresh";
         el("tierManzilSub").textContent = nMz + " ayah" + (nMz > 1 ? "s" : "") + " · " + split[2] + " min";
       }
       tierRingFor(mz, "tierRingManzilFill", "tierRingManzilNum");
@@ -2382,9 +2429,14 @@
     var surah = getSurah(st.surah);
     el("beginnerCardTitle").textContent = "Stage " + st.n + " · " + st.name;
     var nAy = st.to - st.from + 1;
+    /* v5 audit fix (Nov 8): a single ayah reads "1", not "1–1". */
     el("beginnerCardSub").textContent = "Practice: " + (surah ? surah.englishName : "") +
-      " " + st.from + "–" + st.to + " · " + nAy + " ayah" + (nAy > 1 ? "s" : "");
+      " " + st.from + (st.to > st.from ? "–" + st.to : "") + " · " + nAy + " ayah" + (nAy > 1 ? "s" : "");
     el("beginnerCardBtn").textContent = "Continue Stage " + st.n + " →";
+    /* Progress ring: stages passed / 29 (spec §4.6). */
+    var passed = Math.max(0, beginnerState.currentStage - 1);
+    setRing("beginnerRingFill", "beginnerRingNum", passed, 29);
+    setTxt("beginnerRingNum", passed + " / 29");
   }
 
   function startLesson(tier) {
@@ -2482,6 +2534,7 @@
   var liveHold = false;   // "Don't move on until it's fixed" toggle (default off)
   var liveMistakes = [];  // {id, surah, ayah, ref, wordIndex, correct, heard, status, ts}
   var liveDiag = false;   // diagnostic run: whole surah, report at the end
+  var diagPrevRange = null; // range to restore when leaving diagnostic (Nov 8 audit fix)
   var liveDiagStats = null; // {total, heard, substituted, skipped, extra, tallied:{}}
   var liveSheetWord = -1; // word index open in the correction sheet
   var liveSR = null;      // browser fallback recognizer (Web Speech)
@@ -2563,6 +2616,17 @@
      alignment, or -1 (used for stop-at-wrong-word in karaoke modes). */
   function applyLiveAlignment(align) {
     if (!live) { return -1; }
+    /* v5 audit fix (Nov 8) — a take where the mic heard NOTHING (empty
+       transcript: blocked mic, silent take, ear timeout) must not flag
+       every word red and must not log "you said —" mistakes. Nothing
+       heard is not a wrong recitation — it is no data. The words stay
+       pending and nothing is written to the mistake history. A take
+       where something was heard (even if every word was wrong) still
+       flags normally: matched is empty but the flagged entries carry
+       real heard words. */
+    var heardAny = Object.keys(align.matched || {}).length > 0 ||
+      (align.flagged || []).some(function (f) { return f.heard && f.heard.length; });
+    if (!heardAny) { return -1; }
     var firstNewBad = -1;
     Object.keys(align.matched).forEach(function (k) {
       var i = parseInt(k, 10);
@@ -2763,7 +2827,14 @@
     if (!live) { return; }
     var ayah = live.ayahs[live.idx];
     var surah = getSurah(live.surah);
-    el("liveSurahLine").textContent = surah ? surah.englishName : "";
+    el("liveSurahLine").textContent = (surah ? surah.englishName : "") +
+      /* v5 audit fix (Nov 8) — the ayah counter's denominator is the
+         lesson range ("Ayah 1 of 5"), but nothing on the stage said what
+         the range was, so "of 7" (diagnostic, whole surah) next to
+         "of 5" (Practice live, 5 ayahs) read as a disagreement. The
+         range is now printed under the top bar; a single ayah reads
+         "Ayah 1", not "Ayahs 1–1". */
+      (live.from === live.to ? " · Ayah " + live.from : " · Ayahs " + live.from + "–" + live.to);
     el("liveFrom").value = live.from;
     el("liveTo").value = live.to;
     el("liveAyahRef").textContent = ayah.ref + " · Ayah " + (live.idx + 1) + " of " + live.ayahs.length;
@@ -2982,14 +3053,14 @@
         if (out.ok && out.data && typeof out.data.text === "string") {
           applyLiveTranscript(out.data.text);
         } else {
-          el("liveStatus").textContent = "The ear did not answer — your words are still on screen. Tap to stop and try again.";
+          el("liveStatus").textContent = "The ear didn't answer. Try again — your place is saved.";
         }
       }
       afterLiveSlice();
     }).catch(function () {
       liveSending = false;
       if (live && liveTakeSeq === seq) {
-        el("liveStatus").textContent = "The ear did not answer — check your connection, then tap to stop and try again.";
+        el("liveStatus").textContent = "The ear didn't answer. Try again — your place is saved.";
       }
       afterLiveSlice();
     });
@@ -3045,7 +3116,7 @@
         el("liveStatus").textContent = "Time's up — tap Done to see your score.";
       }, LIVE_MAX_MS);
     }).catch(function () {
-      showLiveError("Mic is blocked — tap the mic icon in the address bar and allow it, then try again.");
+      showLiveError("The mic needs permission. Allow it in your browser settings, then tap the mic again.");
     });
   }
 
@@ -3081,11 +3152,11 @@
       el("liveInterimLine").hidden = true;
       if (code === "aborted") { return; }
       if (code === "not-allowed" || code === "service-not-allowed") {
-        showLiveError("Mic is blocked — tap the mic icon in the address bar and allow it, then try again.");
+        showLiveError("The mic needs permission. Allow it in your browser settings, then tap the mic again.");
       } else if (code === "no-speech") {
         showLiveError("I did not hear anything — check your mic and try again.");
       } else if (code === "network") {
-        showLiveError("Listening needs internet right now — check your connection and try again.");
+        showLiveError("Listening needs internet. Check your connection and try again.");
       } else {
         showLiveError("Listening stopped — tap the mic to try again.");
       }
@@ -3182,11 +3253,10 @@
     var missed = st.total - st.heard;
     var mistakes = missed + st.extra;
     var pct = st.total ? Math.round(mistakes / st.total * 100) : 0;
+    /* The report line itself is built at the Done site (spec §9.3 two
+       lines); this helper only carries the numbers. */
     return {
       title: "Diagnostic report",
-      line: "Mistakes: " + pct + "% (" + mistakes + " of " + st.total + " words)" +
-        " · Wrong word: " + st.substituted + " · Skipped: " + st.skipped +
-        " · Extra: " + st.extra,
       pct: pct, mistakes: mistakes, total: st.total
     };
   }
@@ -3280,11 +3350,32 @@
     }
     // A diagnostic's report replaces the fix list: showing "No words to
     // fix." above a report that says "Skipped: 1" contradicts itself.
+    // A diagnostic also never banks streak/XP/SM-2 (spec §5.3), so the
+    // recap must not show XP, fixed/dismissed counts, or a streak line
+    // — all three imply something was banked. Its exit button is
+    // "Start learning", not "Next lesson" (spec §2.2).
+    var recapXpEl = el("recapXp"), recapXpExtraEl = el("recapXpExtra"),
+        recapMistakesEl = el("recapMistakes"), recapStreakEl = el("recapStreak"),
+        recapNextBtnEl = el("recapNextBtn");
     if (data.diag) {
       var fixTitle = el("recapFixTitle");
       if (fixTitle) { fixTitle.hidden = true; }
       if (list) { list.hidden = true; }
       if (none) { none.hidden = true; }
+      if (recapXpEl) { recapXpEl.hidden = true; }
+      if (recapXpExtraEl) { recapXpExtraEl.hidden = true; }
+      if (recapMistakesEl) { recapMistakesEl.hidden = true; }
+      if (recapStreakEl) { recapStreakEl.hidden = true; }
+      if (recapNextBtnEl) { recapNextBtnEl.textContent = "Start learning"; }
+    } else {
+      var fixTitle2 = el("recapFixTitle");
+      if (fixTitle2) { fixTitle2.hidden = false; }
+      if (list) { list.hidden = false; }
+      if (recapXpEl) { recapXpEl.hidden = false; }
+      if (recapXpExtraEl) { recapXpExtraEl.hidden = false; }
+      if (recapMistakesEl) { recapMistakesEl.hidden = false; }
+      if (recapStreakEl) { recapStreakEl.hidden = false; }
+      if (recapNextBtnEl) { recapNextBtnEl.textContent = "Next lesson \u2192"; }
     }
     var diag = el("recapDiagReport");
     if (diag) {
@@ -3374,11 +3465,16 @@
     else { tallyLessonAyah(); }
     stopLiveListening();
     if (live.idx >= live.ayahs.length - 1) {
-      liveGoTo(0);
-      el("liveStatus").textContent = "You finished this range — starting again from the top.";
-    } else {
-      liveGoTo(live.idx + 1);
+      /* v5 audit fix (Nov 8) — Next on the last ayah used to loop back
+         to the top ("You finished this range — starting again"), which
+         silently threw away the take and confused everyone. The button
+         is already disabled on the last ayah; if Next is invoked anyway
+         (summary button, keyboard) it now does nothing except say so —
+         Done is the way out of the last ayah. */
+      el("liveStatus").textContent = "This is the last ayah in this range — tap Done to finish.";
+      return;
     }
+    liveGoTo(live.idx + 1);
   }
 
   function livePrev() {
@@ -3407,6 +3503,28 @@
     var heardWords = liveHeardText.trim() ? liveHeardText.trim().split(/\s+/) : [];
     var isLast = live.idx >= live.ayahs.length - 1;
     if (!liveHeardText.trim() && !(liveDiag && isLast)) {
+      if (isLast) {
+        /* v5 audit fix (Nov 8) — Done on the last ayah with nothing
+           heard used to dead-end on the "I did not hear anything"
+           panel: the recap could never be reached without a mic. The
+           recap is a summary, not a reward — it opens with honest
+           zeros and banks nothing (no completed lesson, no XP, no
+           streak), so a blocked-mic user can still finish and see
+           where they stand. */
+        var totalWords = 0;
+        live.ayahs.forEach(function (a) {
+          totalWords += a.arabic.trim() ? a.arabic.trim().split(/\s+/).length : 0;
+        });
+        var st0 = streakStats(todayStr());
+        showRecap({
+          title: "Nothing heard", xp: 0, xpExtra: [],
+          wordsHeard: 0, wordsTotal: totalWords,
+          fixed: 0, dismissed: 0, openMistakes: [],
+          streak: st0.current, dueStr: "nothing banked", diag: null,
+          note: "The mic didn't pick up your recitation — nothing was banked. Check your mic and try again, or listen to your teacher and read along."
+        });
+        return;
+      }
       el("liveSummaryTitle").textContent = "I did not hear anything";
       el("liveSummaryLine").textContent = "No words came through. Check your mic, speak clearly, and try again.";
       el("liveDiagReport").hidden = true;
@@ -3440,9 +3558,12 @@
       tallyLiveAyah();
       recordDiagnosticCompletion();
       var rep = diagReportText();
-      var diagLine = "Mistakes: " + rep.pct + "% · Substituted: " + liveDiagStats.substituted +
-        " · Skipped: " + liveDiagStats.skipped + " · Extra: " + liveDiagStats.extra +
-        " (" + rep.mistakes + " of " + rep.total + " words)";
+      /* Spec §9.3 — two lines, no parenthetical count:
+         "Mistakes: 13%" / "Substituted: 1 · Skipped: 1 · Extra: 0",
+         then the placement band on its own line. The line breaks
+         render via white-space: pre-line on .diag-report-line. */
+      var diagLine = "Mistakes: " + rep.pct + "%\nSubstituted: " + liveDiagStats.substituted +
+        " · Skipped: " + liveDiagStats.skipped + " · Extra: " + liveDiagStats.extra;
       var diagAcc = liveDiagStats.total ? Math.round(liveDiagStats.heard / liveDiagStats.total * 100) : 0;
       // Beginner stage 28 is a diagnostic: pass at >=80% words heard.
       if (live.beginnerStage === 28 && diagAcc >= 80) { passBeginnerStage(28); }
@@ -3451,7 +3572,7 @@
         wordsHeard: liveDiagStats.heard, wordsTotal: liveDiagStats.total,
         fixed: 0, dismissed: 0, openMistakes: [],
         streak: st.current, dueStr: "this was a test — nothing banked",
-        diag: diagLine + " · " + placementBandFor(diagAcc).label,
+        diag: diagLine + "\n" + placementBandFor(diagAcc).label,
         note: (live.beginnerStage === 28 && diagAcc < 80) ? "Not yet — listen again and try." : null
       });
       return;
@@ -3493,6 +3614,7 @@
     // Beginner stage: fold this range into the chain tally (if any) and
     // evaluate the stage pass at the end of the stage.
     var stageNote = null;
+    var chainDone = false;
     if (live.beginnerStage) {
       if (live.chainStats) {
         live.chainStats.heard += totals.heard;
@@ -3500,6 +3622,7 @@
       }
       var isChainEnd = !live.chain || live.chainIdx >= live.chain.ranges.length - 1;
       if (isChainEnd) {
+        chainDone = !!live.chainStats;
         var acc = live.chainStats
           ? (live.chainStats.total ? Math.round(live.chainStats.heard / live.chainStats.total * 100) : 0)
           : pct;
@@ -3510,7 +3633,12 @@
     showRecap({
       title: pct === 100 ? "Lesson done" : "Lesson done — keep going",
       xp: xpAfter - xpBefore, xpExtra: xpExtra,
-      wordsHeard: totals.heard, wordsTotal: totals.total,
+      /* v5 audit fix (Nov 8) — a multi-range stage (9, 25) used to
+         recap only the last range's words ("Heard 10 of 10" for a
+         24-word stage). At the end of a chain the recap reports the
+         stage total, which the chain tally already holds. */
+      wordsHeard: chainDone ? live.chainStats.heard : totals.heard,
+      wordsTotal: chainDone ? live.chainStats.total : totals.total,
       fixed: counts.fixed, dismissed: counts.dismissed, openMistakes: counts.open,
       streak: streakStats(today).current, dueStr: dueStr, diag: null, note: stageNote
     });
@@ -3652,6 +3780,7 @@
      below 50% -> beginner Stage 1; "I can't read Arabic yet" ->
      beginner Stage 1 with no score. Stored in sabaq-v5-placement. */
   var placement = null; // {passage, accuracy, track, startSurah, startAyah, beginnerStage, date}
+  var chooseFromPlacement = false; // Choose sheet opened from placement: Apply places by hand (Nov 8 audit fix)
   var placementWords = []; // [{text, state, heard}] for the current passage
   var placementHeardText = "";
   var placementListening = false;
@@ -3709,7 +3838,17 @@
       var cls = "placement-word";
       if (w.state === "good") { cls += " is-good"; }
       else if (w.state === "bad") { cls += " is-bad"; }
-      html += '<span class="' + cls + '" data-word="' + i + '" role="button" tabindex="0">' + escHtml(w.text) + "</span>";
+      /* v5 audit fix (Nov 8) — a pending word is not a button: it did
+         nothing when tapped, but role="button" made it look tappable.
+         Only a flagged (bad) word is actionable — it opens the
+         correction sheet. */
+      var actionable = w.state === "bad";
+      /* v5 audit fix (Nov 9) — the spans used to be concatenated with NO
+         separator, so the browser saw one unbreakable run: the whole
+         13-word passage sat on one line and overflowed off the left
+         edge (RTL), hiding most of the Fatiha. A real space between
+         spans gives the line break opportunities it needs. */
+      html += '<span class="' + cls + '"' + (actionable ? ' data-word="' + i + '" role="button" tabindex="0"' : "") + '>' + escHtml(w.text) + "</span> ";
     });
     box.innerHTML = html;
     forEach(box.querySelectorAll("[data-word]"), function (sp) {
@@ -3797,8 +3936,9 @@
       saveBeginner();
       renderBeginnerCard();
     } else if (placement.track === "memorization") {
-      setLessonPicker(placement.startSurah || 78, placement.startAyah || 1,
-        (placement.startAyah || 1) + LESSON_LEVELS[lessonLevel].ayahs - 1);
+      var ps = placement.startSurah || 78, pa = placement.startAyah || 1;
+      setLessonPicker(ps, pa, pa + LESSON_LEVELS[lessonLevel].ayahs - 1);
+      persistPlacementStart(ps, pa, pa + LESSON_LEVELS[lessonLevel].ayahs - 1);
     }
     showScreen("today");
     return true;
@@ -3839,17 +3979,17 @@
       }
     }).catch(function () {
       placementSending = false;
-      placementError("Listening needs internet. You can still start — tap 'I can't read Arabic yet' and we will place you by hand later.");
+      placementError("Listening needs internet. You can still start — tap 'I can read — let me choose where to start' below, no mic needed.");
     });
   }
   function togglePlacementMic() {
     if (placementListening) { stopPlacementListening(); return; }
     if (!SABAQ_EAR_URL) {
-      placementError("Listening needs internet. You can still start — tap 'I can't read Arabic yet' and we will place you by hand later.");
+      placementError("Listening needs internet. You can still start — tap 'I can read — let me choose where to start' below, no mic needed.");
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can't read Arabic yet' to skip.");
+      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can read — let me choose where to start' below. No mic needed.");
       return;
     }
     el("placementStatus").classList.remove("practice-error");
@@ -3881,7 +4021,7 @@
       setPlacementMicUI(true);
       placementTimer = setTimeout(function () { stopPlacementListening(); }, 30000);
     }).catch(function () {
-      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can't read Arabic yet' to skip.");
+      placementError("The mic needs permission. Tap the mic again and allow it — or tap 'I can read — let me choose where to start' below. No mic needed.");
     });
   }
   /* Correction sheet, placement context: Retry re-takes the passage,
@@ -3974,7 +4114,7 @@
     if (!st.surah) { return ""; }
     var surah = getSurah(st.surah);
     var nAy = st.to - st.from + 1;
-    return "Practice: " + (surah ? surah.englishName : "") + " " + st.from + "–" + st.to +
+    return "Practice: " + (surah ? surah.englishName : "") + " " + st.from + (st.to > st.from ? "–" + st.to : "") +
       " · " + nAy + " ayah" + (nAy > 1 ? "s" : "");
   }
   function renderBeginnerPath() {
@@ -3996,11 +4136,15 @@
           '<p class="stage-title">Stage ' + st.n + ' · ' + st.name + '</p>' +
           '<p class="stage-sub">' + (st.n === 29 ? "You finished the path." : stagePassageLabel(st)) + '</p>';
         if (st.n === 29) {
-          if (beginnerState.graduated && !beginnerState.graduationSeen) {
-            // The graduation card below carries the CTA — do not repeat it.
+          /* v5 audit fix (Nov 8) — once graduated, Stage 29 stays
+             "Passed ✓". The old code showed "Start memorizing →" again
+             after the graduation card was dismissed, and tapping it
+             re-ran applyGraduation, resetting Sabaq to An-Naba 78:1
+             and wiping the user's real position. */
+          if (beginnerState.graduated) {
             html += '<span class="stage-state">Passed ✓</span>';
           } else {
-            html += '<button class="primary-btn stage-btn" type="button" data-stage-start="29"' + (beginnerState.graduated ? "" : " disabled") + '>Start memorizing →</button>';
+            html += '<button class="primary-btn stage-btn" type="button" data-stage-start="29" disabled>Start memorizing →</button>';
           }
         } else if (passed) {
           html += '<span class="stage-state">Passed ✓</span>' +
@@ -4061,6 +4205,10 @@
   }
   function applyGraduation() {
     if (!beginnerState) { loadBeginner(); }
+    /* Graduation is a one-way door: if it was already applied (seen),
+       a repeat tap is a no-op — it must never reset Sabaq to 78:1
+       after the user has moved on. */
+    if (beginnerState.graduated && beginnerState.graduationSeen) { showScreen("today"); return; }
     beginnerState.graduationSeen = true;
     saveBeginner();
     if (!placement) { placement = { passage: "none", accuracy: null, track: "memorization", startSurah: 78, startAyah: 1, beginnerStage: null, date: todayStr() }; }
@@ -4149,6 +4297,15 @@
     });
     el("placementNoReadBtn").addEventListener("click", placementNoRead);
     el("placementStartBtn").addEventListener("click", applyPlacement);
+    /* v5 audit fix (Nov 8) — the no-mic route for a reader: pick a
+       surah by hand, no mic needed. The Choose sheet is shared with
+       Today; chooseFromPlacement tells its Apply button to place the
+       user at the chosen surah (memorization track) instead of only
+       editing the lesson picker. */
+    el("placementChooseBtn").addEventListener("click", function () {
+      chooseFromPlacement = true;
+      openSheet("chooseSheet");
+    });
 
     /* --- Today --- */
     el("tierSabaqStart").addEventListener("click", function () { startLesson("sabaq"); });
@@ -4157,14 +4314,27 @@
     el("lessonDiagnosticBtn").addEventListener("click", lessonDiagnostic);
     el("timeMinus").addEventListener("click", function () { cycleTime(-1); });
     el("timePlus").addEventListener("click", function () { cycleTime(1); });
-    el("chooseLink").addEventListener("click", function () { openSheet("chooseSheet"); });
-    el("chooseSheetClose").addEventListener("click", function () { closeSheet("chooseSheet"); });
+    el("chooseLink").addEventListener("click", function () { chooseFromPlacement = false; openSheet("chooseSheet"); });
+    el("chooseSheetClose").addEventListener("click", function () { chooseFromPlacement = false; closeSheet("chooseSheet"); });
     el("chooseApplyBtn").addEventListener("click", function () {
       var surahNum = parseInt(el("lessonSurahSelect").value, 10) || 1;
       var from = parseInt(el("lessonFrom").value, 10) || 1;
       var to = parseInt(el("lessonTo").value, 10) || from;
       setLessonPicker(surahNum, from, to);
       closeSheet("chooseSheet");
+      if (chooseFromPlacement) {
+        /* Placing by hand from the front door: the chosen surah is the
+           starting point (memorization track, from the chosen ayah).
+           No mic, no score — the user chose it themselves. Persist it
+           like a placed start so a reload keeps it (same fix as
+           applyPlacement). */
+        chooseFromPlacement = false;
+        placement = { passage: "chosen", accuracy: null, track: "memorization",
+                      startSurah: surahNum, startAyah: from, beginnerStage: null, date: todayStr() };
+        savePlacement();
+        persistPlacementStart(surahNum, from, to);
+        showScreen("today");
+      }
     });
     el("beginnerCardBtn").addEventListener("click", function () {
       if (beginnerState) { startBeginnerStage(beginnerState.currentStage); }
@@ -4284,8 +4454,12 @@
     });
     el("downloadSurahBtn").addEventListener("click", downloadSurah);
     el("learnThisSurahBtn").addEventListener("click", function () {
+      /* v5 audit fix (Nov 8) — this used to seed Today and switch to the
+         Today tab, where nothing visibly changed: it read as a dead
+         button. "Learn this surah" now does what it says: it sets
+         Today's Sabaq to this surah AND opens the lesson for it. */
       setLessonPicker(state.currentSurah, 1, LESSON_LEVELS[lessonLevel].ayahs);
-      showScreen("today");
+      startLesson("sabaq");
     });
     el("wordSheetClose").addEventListener("click", function () { closeSheet("wordSheet"); });
     el("wordSheetPractice").addEventListener("click", function () {
@@ -4318,7 +4492,15 @@
     el("liveSummaryNextBtn").addEventListener("click", liveNext);
     el("liveApplyRange").addEventListener("click", function () {
       if (!live) { return; }
-      openLive(live.surah, parseInt(el("liveFrom").value, 10), parseInt(el("liveTo").value, 10));
+      var from = parseInt(el("liveFrom").value, 10), to = parseInt(el("liveTo").value, 10);
+      var surah = getSurah(live.surah);
+      if (!openLive(live.surah, from, to)) { return; }
+      /* v5 audit fix (Nov 8) — after Apply the range changes silently
+         (e.g. To=1 leaves a single ayah, so Next is correctly disabled
+         and the user has no idea why). Say the new range out loud. */
+      var name = surah ? surah.englishName : "";
+      el("liveStatus").textContent = "Range set: " + name + " " + live.from + (live.to > live.from ? "–" + live.to : "") + "." +
+        (live.from === live.to ? " One ayah — tap Done when finished." : "");
     });
     el("liveChangeSurah").addEventListener("click", function () { showScreen("mushaf"); });
     el("liveHoldToggle").addEventListener("click", function () { setLiveHold(!liveHold); });
@@ -4332,6 +4514,19 @@
     el("liveSheetCloseBtn").addEventListener("click", closeLiveSheet);
     el("liveSheet").addEventListener("click", function (ev) {
       if (ev.target === el("liveSheet")) { closeLiveSheet(); }
+    });
+    /* v5 audit fix (Nov 8) — Escape closes any open sheet. The reciter
+       picker used to trap the user: its Close × was off-screen and
+       Escape did nothing, so only picking a reciter could close it. */
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape" && ev.key !== "Esc") { return; }
+      var anyOpen = false;
+      forEach(document.querySelectorAll(".sheet-overlay"), function (sh) {
+        if (!sh.hidden) { anyOpen = true; }
+      });
+      if (anyOpen) { closeSheets(); return; }
+      var ls = el("liveSheet");
+      if (ls && !ls.hidden) { closeLiveSheet(); }
     });
     el("liveSheetRetry").addEventListener("click", liveSheetRetry);
     el("liveSheetDismiss").addEventListener("click", liveSheetDismiss);

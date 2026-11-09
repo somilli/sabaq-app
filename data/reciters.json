@@ -1,1 +1,77 @@
-{"defaultReciter":"abdul-basit","meta":{"attribution":"Audio: everyayah.com / VerseByVerseQuran.com / QuranicAudio.com — link-back required, see credits screen. Per-ayah splits are manual and occasionally imperfect.","audioBase":"https://everyayah.com/data","note":"Hafs-first per Sory's Nov 2, 2026 decision. Warsh editions are registered as PARTIAL, never the default.","urlPattern":"{audioBase}/{folder}/{SSS}{AAA}.mp3 — SSS = 3-digit surah, AAA = 3-digit ayah (e.g. 001001.mp3 = Al-Fatiha 1:1)"},"reciters":[{"arabicName":"عبد الباسط عبد الصمد","bitrate":"192kbps","folder":"Abdul_Basit_Murattal_192kbps","fullQuranSize":"1.79 GB (per Quran Majeed listing in Sory's recording)","id":"abdul-basit","name":"AbdulBasit AbdulSamad","qiraat":"hafs","status":"full","style":"Murattal"},{"arabicName":"محمد صديق المنشاوي","bitrate":"128kbps","folder":"Minshawy_Murattal_128kbps","fullQuranSize":"1.25 GB (per Quran Majeed listing in Sory's recording)","id":"minshawi","name":"Muhammad Siddiq Al-Minshawi","qiraat":"hafs","status":"full","style":"Murattal"},{"arabicName":"ياسر الدوسري","bitrate":"128kbps","folder":"Yasser_Ad-Dussary_128kbps","fullQuranSize":"1.5 GB (per Quran Majeed listing in Sory's recording)","id":"yasser-dosari","name":"Yasser Al-Dosari","qiraat":"hafs","status":"full","style":"Murattal"},{"arabicName":"سعد الغامدي","bitrate":"40kbps — lower bitrate, thinner sound than the others","folder":"Ghamadi_40kbps","fullQuranSize":"446.2 MB (per Quran Majeed listing in Sory's recording)","id":"saad-ghamdi","name":"Saad Al-Ghamdi","qiraat":"hafs","status":"full","style":"Murattal"},{"arabicName":"عبد الباسط عبد الصمد","bitrate":"128kbps","folder":"warsh/warsh_Abdul_Basit_128kbps","id":"abdul-basit-warsh","knownGaps":"47 files missing per everyayah's own list","name":"AbdulBasit AbdulSamad (Warsh)","qiraat":"warsh","status":"partial","style":"Warsh"},{"arabicName":"إبراهيم الدوسري","bitrate":"128kbps","folder":"warsh/warsh_ibrahim_aldosary_128kbps","id":"ibrahim-dosary-warsh","knownGaps":null,"name":"Ibrahim Al-Dosary (Warsh)","qiraat":"warsh","status":"partial","style":"Warsh"}]}
+{
+ "defaultReciter": "abdul-basit",
+ "meta": {
+  "attribution": "Audio: everyayah.com / VerseByVerseQuran.com / QuranicAudio.com — link-back required, see credits screen. Per-ayah splits are manual and occasionally imperfect.",
+  "audioBase": "https://everyayah.com/data",
+  "note": "Hafs-first per Sory's Nov 2, 2026 decision. Warsh editions are registered as PARTIAL, never the default.",
+  "urlPattern": "{audioBase}/{folder}/{SSS}{AAA}.mp3 — SSS = 3-digit surah, AAA = 3-digit ayah (e.g. 001001.mp3 = Al-Fatiha 1:1)"
+ },
+ "reciters": [
+  {
+   "arabicName": "عبد الباسط عبد الصمد",
+   "bitrate": "192kbps",
+   "folder": "Abdul_Basit_Murattal_192kbps",
+   "fullQuranSize": "1.79 GB",
+   "id": "abdul-basit",
+   "name": "AbdulBasit AbdulSamad",
+   "qiraat": "hafs",
+   "status": "full",
+   "style": "Murattal"
+  },
+  {
+   "arabicName": "محمد صديق المنشاوي",
+   "bitrate": "128kbps",
+   "folder": "Minshawy_Murattal_128kbps",
+   "fullQuranSize": "1.25 GB",
+   "id": "minshawi",
+   "name": "Muhammad Siddiq Al-Minshawi",
+   "qiraat": "hafs",
+   "status": "full",
+   "style": "Murattal"
+  },
+  {
+   "arabicName": "ياسر الدوسري",
+   "bitrate": "128kbps",
+   "folder": "Yasser_Ad-Dussary_128kbps",
+   "fullQuranSize": "1.5 GB",
+   "id": "yasser-dosari",
+   "name": "Yasser Al-Dosari",
+   "qiraat": "hafs",
+   "status": "full",
+   "style": "Murattal"
+  },
+  {
+   "arabicName": "سعد الغامدي",
+   "bitrate": "40kbps",
+   "folder": "Ghamadi_40kbps",
+   "fullQuranSize": "446.2 MB",
+   "id": "saad-ghamdi",
+   "name": "Saad Al-Ghamdi",
+   "qiraat": "hafs",
+   "status": "full",
+   "style": "Murattal"
+  },
+  {
+   "arabicName": "عبد الباسط عبد الصمد",
+   "bitrate": "128kbps",
+   "folder": "warsh/warsh_Abdul_Basit_128kbps",
+   "id": "abdul-basit-warsh",
+   "knownGaps": "47 files missing per everyayah's own list",
+   "name": "AbdulBasit AbdulSamad (Warsh)",
+   "qiraat": "warsh",
+   "status": "partial",
+   "style": "Warsh"
+  },
+  {
+   "arabicName": "إبراهيم الدوسري",
+   "bitrate": "128kbps",
+   "folder": "warsh/warsh_ibrahim_aldosary_128kbps",
+   "id": "ibrahim-dosary-warsh",
+   "knownGaps": null,
+   "name": "Ibrahim Al-Dosary (Warsh)",
+   "qiraat": "warsh",
+   "status": "partial",
+   "style": "Warsh"
+  }
+ ]
+}
