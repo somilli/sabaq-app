@@ -2489,3 +2489,481 @@ body.stage-open .app { padding-bottom: 32px; }
 
 /* --- Sheets: lesson picker inside the Choose sheet --- */
 #chooseSheet .lesson-picker { margin-top: 8px; padding-top: 0; border-top: none; }
+
+/* ================= v5.1 — UI pass (Nov 9) =================
+   Duolingo's game energy + Sabaq's own identity. FEEL ONLY: no
+   app.js change, no data change, no font change, no copy change
+   except the +XP reward chip (the quest carries no fixed XP amount
+   in the app, so the chip says +XP, not an invented number).
+   Palette discipline: ink / paper / gold only, no new hexes —
+   every colour below is an existing token or an rgba() of one.
+   The 13 audit fixes from dd8cef0 are untouched: mic stays 96px,
+   sheet backdrop stays rgba(27,27,24,.55), no beige anywhere,
+   Arabic words are never scaled or bounced (colour/underline only).
+
+   Keyframes that must HOLD their end state use `forwards` (the
+   recap checkmark draw). Entrance animations use no fill mode, so
+   the element returns to its natural styles when the animation
+   ends — a lingering transform would break sticky positioning
+   inside screens (read toolbar) and fixed descendants. */
+
+/* ---------- Motion tokens ---------- */
+@keyframes v51-screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes v51-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes v51-pop-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes v51-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes v51-sheet-up {
+  from { opacity: 0; transform: translateY(48px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes v51-mic-ring {
+  0% { transform: scale(0.92); opacity: 0.9; }
+  100% { transform: scale(1.28); opacity: 0; }
+}
+@keyframes v51-node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(197, 160, 89, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(197, 160, 89, 0); }
+}
+@keyframes v51-rc-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes v51-rc-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- 1. MOTION: screen transitions ---------- */
+/* Runs each time a screen becomes active (display none -> block). */
+.screen.is-active { animation: v51-screen-in 0.28s ease; }
+
+/* Intro: title, tag and guest button rise in behind the Basmala. */
+#screen-intro.is-active .intro-basmala-en { animation: v51-rise-in 0.5s 0.1s ease; }
+#screen-intro.is-active .intro-tag { animation: v51-rise-in 0.5s 0.18s ease; }
+#screen-intro.is-active .intro-guest { animation: v51-rise-in 0.5s 0.26s ease; }
+
+/* Cards that appear (not on every render): due strip, placement
+   result, per-ayah summary, recap card. */
+.due-strip { animation: v51-pop-in 0.3s ease; }
+.placement-result { animation: v51-pop-in 0.3s ease; }
+.live-summary { animation: v51-pop-in 0.3s ease; }
+#screen-live.show-recap .recap-card { animation: v51-pop-in 0.4s cubic-bezier(0.22, 0.68, 0.24, 1); }
+
+/* ---------- 1b. MOTION: press states (chunky, Duolingo-like) ---------- */
+.primary-btn, .ghost-btn, .back-btn, .nav-btn, .level-btn,
+.cap-mode, .cap-font, .toolbar-btn, .stepper-btn, .surah-row,
+.reciter-row, .juz-tile, .stage-btn, .due-item-start, .playback-btn,
+.sheet-close, .stage-close, .qiraat-pill, .live-mistake,
+.tier-start, .mic-btn, .link-btn, .live-toggle, .reciter-row,
+.cap-teacher, .due-strip-btn {
+  transition: transform 0.12s ease, box-shadow 0.18s ease,
+    background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease, opacity 0.18s ease;
+}
+.primary-btn:active:not(:disabled), .ghost-btn:active:not(:disabled),
+.back-btn:active, .nav-btn:active, .level-btn:active,
+.cap-mode:active, .cap-font:active, .toolbar-btn:active,
+.stepper-btn:active, .due-item-start:active, .playback-btn:active,
+.sheet-close:active, .stage-close:active, .qiraat-pill:active,
+.live-toggle:active, .cap-teacher:active, .due-strip-btn:active {
+  transform: scale(0.97);
+}
+.surah-row:active, .reciter-row:active, .juz-tile:active,
+.live-mistake:active { transform: scale(0.98); }
+.mic-btn:active:not(:disabled) { transform: scale(0.95); }
+
+/* ---------- 1c. MOTION: XP bars + rings animate to their values ---------- */
+/* Rings already transition stroke-dashoffset (600ms, set in v5).
+   XP bars are set by inline width in JS — give them the same glide. */
+.xp-bar-fill { transition: width 0.7s cubic-bezier(0.22, 0.68, 0.24, 1); }
+.week-bar { transition: height 0.6s ease; }
+
+/* ---------- 1d. MOTION: word-feedback animation ----------
+   Colour / underline ONLY on the Arabic itself — the words never
+   scale, bounce or move, so the text stays perfectly readable. */
+.cap-word, .lf-word, .placement-word, .flow-word, .flow-ayah {
+  transition: color 0.25s ease, background-color 0.25s ease,
+    outline-color 0.25s ease;
+}
+.cap-word .cap-ar, .cap-detail-ar {
+  transition: color 0.25s ease;
+}
+/* The feedback UI around the words eases in when its state changes;
+   the words themselves only ever change colour — never scale. */
+.cap-detail { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+
+/* ---------- 1e. MOTION: mic listening ring (enhanced) ----------
+   The 96px button is FIXED (audit fix). The pulse now has a second,
+   expanding ring outside the button instead of a bigger button. */
+.mic-btn { position: relative; box-shadow: 0 8px 20px rgba(27, 27, 24, 0.25); }
+.mic-btn.is-listening { box-shadow: 0 8px 20px rgba(192, 57, 43, 0.35); }
+.mic-btn.is-listening::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  border: 2px solid rgba(192, 57, 43, 0.55);
+  pointer-events: none;
+  animation: v51-mic-ring 1.4s ease-out infinite;
+}
+
+/* ---------- 1f. MOTION: sheets slide up, backdrop fades ---------- */
+/* Animations re-run each time a sheet opens (hidden removed). */
+.sheet-overlay { animation: v51-overlay-fade 0.22s ease; }
+.sheet-overlay .sheet { animation: v51-sheet-up 0.34s cubic-bezier(0.22, 0.68, 0.24, 1); }
+
+/* ---------- 1g. RECAP: celebration moment ----------
+   Gold checkmark draws itself when the recap appears; the XP number
+   already counts up in JS (countUpXp). Respectful: no emoji rain,
+   no confetti — the check is the celebration. */
+.recap-celebration {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0 12px;
+}
+.recap-celebration svg { display: block; width: 72px; height: 72px; }
+.recap-celebration .rc-circle {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-dasharray: 214;
+  stroke-dashoffset: 214;
+}
+.recap-celebration .rc-check {
+  fill: none;
+  stroke: var(--gold-dark);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+}
+#screen-live.show-recap .recap-celebration { animation: v51-rc-pop 0.45s cubic-bezier(0.22, 0.68, 0.24, 1); }
+#screen-live.show-recap .recap-celebration .rc-circle { animation: v51-rc-draw 0.6s ease-out forwards; }
+#screen-live.show-recap .recap-celebration .rc-check { animation: v51-rc-draw 0.35s ease-out 0.45s forwards; }
+.recap-card { text-align: center; }
+.recap-card .recap-fix-list, .recap-card .recap-fix-title { text-align: left; }
+
+/* ---------- 2. DEPTH: layered cards ---------- */
+.tier-card, .quest-card, .stats-section, .badges-section,
+.parent-card, .stage-card, .recap-card, .live-range, .cap-detail,
+.read-settings, .translation-note, .live-summary, .diag-report,
+.due-item, .live-mistake, .stat-card, .badge-card,
+.graduation-card, .xp-banner, .streak-card, .practice {
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05),
+    0 10px 28px rgba(27, 27, 24, 0.06);
+}
+.surah-row, .reciter-row {
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.04),
+    0 6px 18px rgba(27, 27, 24, 0.05);
+}
+
+/* Elevated primary buttons with press depth. */
+.primary-btn { box-shadow: 0 6px 16px rgba(27, 27, 24, 0.22); }
+.primary-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 2px 8px rgba(27, 27, 24, 0.2);
+}
+.primary-btn:disabled { box-shadow: none; }
+
+/* Sticky topbar: hairline + a whisper of shadow, safe-area aware. */
+.topbar {
+  box-shadow: 0 2px 14px rgba(27, 27, 24, 0.05);
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+}
+
+/* ---------- 3. APP SHELL: floating dock nav ----------
+   The nav is a floating dock now, not a flat bar. Everything that
+   used to sit 64px above the bottom edge moves up to clear it:
+   read toolbar, playback bar, sheet bottom margin. */
+.bottom-nav {
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(27, 27, 24, 0.16),
+    0 1px 4px rgba(27, 27, 24, 0.08);
+}
+.nav-btn { position: relative; }
+.nav-btn.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--gold);
+}
+.read-toolbar { bottom: 92px; }
+.playback-bar { bottom: 92px; }
+.sheet { margin-bottom: 100px; }
+/* The floating dock raised the read toolbar from 64px to 92px above
+   the bottom edge, so the toolbar's top edge moved up 28px. The v5
+   audit fix (110px bottom padding on the Mushaf flow) was calibrated
+   for 64px — raise it by the same 28px so the last ayah still scrolls
+   fully above the toolbar. Verified by a max-scroll screenshot. */
+.mushaf-flow { padding-bottom: 140px; }
+
+/* ---------- 4a. GAME FEEL: Today player bar ---------- */
+.player-bar {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 16px 18px 14px;
+  margin: 12px 0 0;
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05),
+    0 10px 28px rgba(27, 27, 24, 0.06);
+}
+.player-bar .today-header-big { font-size: 34px; }
+/* Level line becomes a gold badge on the XP side only. */
+.player-bar .today-header-right .today-header-sub {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  color: var(--gold-dark);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ---------- 4b. GAME FEEL: daily quest + reward chip ---------- */
+.quest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.quest-head .quest-kicker { margin: 0; }
+.quest-reward {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.quest-card.is-done .quest-reward { background: var(--gold); color: var(--ink); }
+.quest-card.is-done { box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05), 0 10px 28px rgba(197, 160, 89, 0.25); }
+
+/* ---------- 4c. GAME FEEL: tier cards become a path ----------
+   A rail runs down the left; each card is a node. Done = gold with
+   a check, current (Sabaq, the next lesson) = ink node with a gold
+   ring, locked (empty Sabqi / Manzil, disabled button) = muted. */
+.tier-list { position: relative; }
+.tier-list::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 28px;
+  bottom: 28px;
+  width: 4px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.tier-list .tier-card { position: relative; margin-left: 40px; }
+.tier-list .tier-card::before {
+  content: "1";
+  position: absolute;
+  left: -30px;
+  top: 18px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.tier-list .tier-card:nth-child(2)::before { content: "2"; }
+.tier-list .tier-card:nth-child(3)::before { content: "3"; }
+.tier-list .tier-card.is-done::before {
+  content: "\2713";
+  background: var(--gold);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 4px var(--gold);
+}
+.tier-list .tier-card:has(.tier-start:disabled)::before {
+  background: var(--paper);
+  color: var(--muted);
+  border: 3px solid var(--line);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.tier-list .tier-card.is-done {
+  border-color: var(--gold);
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05), 0 10px 28px rgba(197, 160, 89, 0.22);
+}
+/* The beginner card keeps its ring; it just gains the same depth. */
+.beginner-card { border-color: var(--gold); }
+
+/* Settings row: a hairline divider so Today reads top-to-bottom
+   as player bar -> quest -> path -> settings. */
+.today-settings {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+/* ---------- 4d. GAME FEEL: lesson stage ----------
+   The "Ayah N of M" line becomes a progress pill. The segmented
+   lesson-progress bar is NOT built here: no element in the DOM
+   carries the segment count, so it needs a tiny app.js hook —
+   flagged in the build report instead of faked with CSS. */
+.stage-topbar .live-ayah {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05);
+}
+/* Narrow screens: the pill does not fit beside the close × and the
+   Hafs/Warsh switch — it wrapped to two lines inside the pill.
+   On phone widths it gets its own full-width row under the controls
+   instead (desktop keeps it inline: it fits there on one line). */
+@media (max-width: 560px) {
+  .stage-topbar { flex-wrap: wrap; }
+  .stage-topbar .live-ayah {
+    order: 3;
+    flex: 1 1 100%;
+    margin-top: 4px;
+    text-align: center;
+  }
+}
+.stage-card.is-current, .tier-card.is-current {
+  border-color: var(--gold);
+}
+
+/* ---------- 4e. GAME FEEL: beginner path map (29 stages) ----------
+   Same node-and-rail language as the tier path, driven by the
+   classes app.js already sets: is-passed / is-current / is-locked. */
+.beginner-levels { position: relative; }
+.beginner-levels::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.beginner-level-title { margin-left: 44px; }
+.stage-card { position: relative; margin-left: 44px; }
+.stage-card::before {
+  content: "";
+  position: absolute;
+  left: -34px;
+  top: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--line);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.stage-card.is-passed::before {
+  content: "\2713";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  border-color: var(--gold-dark);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+.stage-card.is-current::before {
+  background: var(--ink);
+  border-color: var(--gold-dark);
+  animation: v51-node-pulse 1.6s ease-in-out infinite;
+}
+.stage-card.is-current {
+  border-color: var(--gold);
+  box-shadow: 0 1px 2px rgba(27, 27, 24, 0.05),
+    0 10px 28px rgba(197, 160, 89, 0.22);
+}
+.stage-card.is-locked::before { background: var(--paper); }
+
+/* ---------- 4f. GAME FEEL: Progress — juz map + badges ----------
+   Tiles already carry is-done / is-current / is-progress from JS.
+   Depth + state glow only; the ✓ label and fill % are untouched. */
+.juz-tile.is-done {
+  box-shadow: 0 4px 12px rgba(197, 160, 89, 0.35);
+}
+.juz-tile.is-current {
+  box-shadow: 0 4px 14px rgba(27, 27, 24, 0.3);
+}
+.juz-tile.is-progress {
+  box-shadow: 0 2px 8px rgba(197, 160, 89, 0.25);
+}
+.badge-card { transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
+.badge-card.is-earned {
+  box-shadow: 0 6px 16px rgba(197, 160, 89, 0.28);
+}
+.badge-card.is-earned .badge-icon { transform: scale(1.08); }
+.badge-card:not(.is-earned) .badge-icon { opacity: 0.55; }
+
+/* ---------- 5. DESKTOP: centered app panel ---------- */
+@media (min-width: 760px) {
+  .topbar {
+    max-width: 776px;
+    margin: 0 auto;
+  }
+  .app {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    box-shadow: 0 24px 60px rgba(27, 27, 24, 0.1),
+      0 2px 8px rgba(27, 27, 24, 0.05);
+    margin: 20px auto 28px;
+    padding: 28px 28px calc(140px + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-nav {
+    left: 50%;
+    right: auto;
+    width: min(696px, calc(100vw - 24px));
+    transform: translateX(-50%);
+  }
+  .app-footer { padding-bottom: 140px; }
+}
+
+/* ---------- Reduced motion: every v5.1 animation off ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .screen.is-active, #screen-intro.is-active .intro-basmala-en,
+  #screen-intro.is-active .intro-tag, #screen-intro.is-active .intro-guest,
+  .due-strip, .placement-result, .live-summary,
+  #screen-live.show-recap .recap-card, .sheet-overlay,
+  .sheet-overlay .sheet, .cap-word.is-current,
+  .mic-btn.is-listening::after, .stage-card.is-current::before,
+  #screen-live.show-recap .recap-celebration,
+  #screen-live.show-recap .recap-celebration .rc-circle,
+  #screen-live.show-recap .recap-celebration .rc-check,
+  .juz-tile.is-current, .mic-btn.is-listening {
+    animation: none !important;
+  }
+  .xp-bar-fill, .week-bar, .ring-fill {
+    transition: none !important;
+  }
+}

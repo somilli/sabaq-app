@@ -87,7 +87,7 @@
 
   <!-- ============ TAB 1 — TODAY (v5 home) ============ -->
   <section class="screen" id="screen-today" data-screen="today" aria-label="Today">
-    <div class="today-header">
+    <div class="today-header player-bar">
       <div class="today-header-block">
         <span class="today-header-big"><span aria-hidden="true">&#128293;</span> <span id="streakNum">0</span></span>
         <span class="today-header-sub" id="streakLabel">day streak</span>
@@ -101,7 +101,13 @@
 
     <!-- v5: daily quest card -->
     <div class="quest-card" id="questCard">
-      <p class="quest-kicker">Today&rsquo;s quest</p>
+      <div class="quest-head">
+        <p class="quest-kicker">Today&rsquo;s quest</p>
+        <!-- v5.1: reward chip. The quest itself carries no fixed XP amount
+             in the app (lessons bank the XP), so the chip says +XP, not a
+             number — no invented reward. -->
+        <span class="quest-reward" aria-hidden="true">+XP</span>
+      </div>
       <p class="quest-title" id="questTitle">30 verses or 1 juz</p>
       <div class="quest-body">
         <svg class="ring" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
@@ -409,6 +415,15 @@
 
     <!-- v5 recap — replaces the stage when the lesson ends -->
     <div class="recap-card" id="recapCard" hidden>
+      <!-- v5.1: celebration moment — gold checkmark draws itself when the
+           recap appears (CSS animation keyed off .show-recap). No emoji,
+           no confetti: the text is the Quran, the gold check is the party. -->
+      <div class="recap-celebration" aria-hidden="true">
+        <svg viewBox="0 0 72 72" width="72" height="72">
+          <circle class="rc-circle" cx="36" cy="36" r="34"></circle>
+          <path class="rc-check" d="M22 37 L32 47 L50 27"></path>
+        </svg>
+      </div>
       <h2 class="recap-title" id="recapTitle">Lesson done</h2>
       <p class="recap-note" id="recapNote" hidden></p>
       <p class="recap-xp" id="recapXp">+50 XP</p>
