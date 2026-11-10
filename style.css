@@ -3323,3 +3323,351 @@ body {
       0 2px 8px rgba(27, 27, 24, 0.05);
   }
 }
+
+/* ================= v5.3 — DEEP CANVAS (Nov 10) =================
+   The user is right: v5.2 changed buttons and fonts but the app still
+   reads as the same flat paper page — the :root palette never moved,
+   the glass had nothing behind it to refract (flat #FDFCF8), and the
+   font swap was to near-lookalikes. This pass changes what you see
+   on first load, CSS only, no app.js change, no logic change.
+
+   What is different, on purpose:
+   - The page is now a deep emerald canvas: layered gradient + gold
+     light + a subtle eight-point-star lattice, fixed behind everything,
+     so the frosted glass finally has something to refract.
+   - Chrome goes dark: topbar and dock are deep-emerald glass. The
+     dock's 0.55 alpha (which let page text bleed through the labels)
+     is now 0.94 — the ghost-text defect is fixed, not papered over.
+   - Display type is a NEW face — Playfair Display (bundled woff2,
+     SIL OFL), not another Fraunces lookalike — and the scale jumps:
+     screen titles 30px -> 42px, hero numbers 34px -> 44px, tier
+     titles 20px -> 24px.
+   - Gold gets richer and louder (D9A441 / F2C75C) where it counts:
+     buttons, numbers, the current-lesson card.
+   - The current lesson card (#tierSabaq) is a dark emerald hero card
+     so Today has one unmistakable focal point; the player bar is a
+     matching dark glass tile with gold gradient numbers.
+   - Arabic never moves: Scheherazade New untouched, and the Mushaf
+     flow sits on an opaque paper page floating on the canvas, so
+     Uthmani text stays exactly as legible as before.
+   - Every label that sits directly on the dark canvas (titles, subs,
+     placement copy, live-screen copy, read headers, pills) is
+     recolored light in this block — nothing ink-on-dark survives. */
+
+/* ---------- New face: Playfair Display (display serif) ---------- */
+@font-face {
+  font-family: "Playfair Display";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("fonts/playfair-display-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --gold-rich: #D9A441;
+  --gold-bright: #F2C75C;
+  --gold-deep: #A67C1A;
+  --emerald-950: #04150F;
+  --emerald-900: #06231B;
+  --emerald-800: #0A3527;
+  --emerald-700: #0F4A37;
+  --gold-grad-53: linear-gradient(180deg, #F4CE6B 0%, #D9A441 45%, #B0811F 100%);
+  --gold-grad-text-53: linear-gradient(180deg, #F6D47E 0%, #D9A441 55%, #A67C1A 100%);
+  /* Display face changes: Fraunces -> Playfair Display. Arabic faces
+     (--font-arabic etc.) are untouched. */
+  --font-head: "Playfair Display", "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+/* ---------- The deep canvas: the glass finally has something to refract ---------- */
+body {
+  background-color: var(--emerald-950);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'%3E%3Cg fill='none' stroke='%23D9A441' stroke-opacity='0.09'%3E%3Crect x='36' y='36' width='40' height='40'/%3E%3Crect x='36' y='36' width='40' height='40' transform='rotate(45 56 56)'/%3E%3Ccircle cx='56' cy='56' r='4'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(900px 520px at 88% -8%, rgba(242, 199, 92, 0.30), rgba(242, 199, 92, 0) 62%),
+    radial-gradient(760px 560px at -12% 108%, rgba(15, 74, 55, 0.85), rgba(15, 74, 55, 0) 62%),
+    radial-gradient(680px 480px at 50% 42%, rgba(16, 87, 63, 0.38), rgba(16, 87, 63, 0) 70%),
+    linear-gradient(168deg, #0A3527 0%, #06231B 48%, #04150F 100%);
+  background-size: 112px 112px, auto, auto, auto, auto;
+  background-attachment: fixed;
+}
+
+/* ---------- Dark glass chrome: topbar ---------- */
+.topbar {
+  background: rgba(5, 26, 19, 0.78);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border-bottom: 1px solid rgba(217, 164, 65, 0.35);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.brand-name { color: #FDFCF8; font-size: 26px; }
+.brand-tag { color: var(--gold-bright); }
+.qiraat-pill {
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 164, 65, 0.5);
+  color: #FDFCF8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- Titles on the dark canvas: bigger, white, gold rule ---------- */
+.screen-title {
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: #FDFCF8;
+}
+.screen-title::before {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--gold-grad-53);
+  margin-bottom: 12px;
+}
+.screen-sub { color: rgba(253, 252, 248, 0.72); font-size: 18px; }
+
+/* ---------- Intro: gold Basmala on deep emerald ---------- */
+/* The base color matters: with prefers-reduced-motion the letters are
+   never split into .lt spans, so the plain phrase must be light too. */
+.intro-basmala { color: #FDFCF8; }
+.intro-basmala .lt.c0 { color: #FDFCF8; }
+.intro-basmala .lt.c1 { color: var(--gold-bright); }
+.intro-basmala .lt.c2 { color: var(--gold-rich); }
+.intro-basmala-en { color: rgba(253, 252, 248, 0.68); }
+.intro-title {
+  font-size: 68px;
+  background: var(--gold-grad-text-53);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.intro-tag { color: #FDFCF8; }
+#screen-intro .hint { color: rgba(253, 252, 248, 0.6); }
+
+/* ---------- Placement front door on the dark canvas ---------- */
+.placement-passage { color: #FDFCF8; }
+.placement-passage-ref { color: rgba(253, 252, 248, 0.65); }
+.placement-listening { color: var(--gold-bright); }
+.placement-result-text { color: #FDFCF8; }
+#screen-placement .link-btn { color: #FDFCF8; }
+.placement-word.is-good { color: #E9BC55; }
+#screen-placement .placement-word.is-bad { color: #F0856F; }
+#screen-placement .ear-line { color: var(--gold-bright); }
+#screen-placement .practice-status { color: rgba(253, 252, 248, 0.68); }
+
+/* ---------- Glass cards, stronger: the emerald shows at the edges ---------- */
+.tier-card, .quest-card, .player-bar, .streak-card, .stats-section,
+.badges-section, .parent-card, .stage-card, .recap-card, .cap-detail,
+.practice, .live-range, .read-settings, .translation-note,
+.surah-row, .reciter-row, .due-item, .live-mistake, .stat-card,
+.badge-card, .graduation-card, .xp-banner, .diag-report,
+.live-summary, .sheet-note, .search-input {
+  background: rgba(253, 252, 248, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 24px;
+  box-shadow: var(--glass-highlight),
+    0 20px 48px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.stat-card, .badge-card { background: rgba(255, 255, 255, 0.92); }
+.search-input { background: rgba(255, 255, 255, 0.88); }
+
+/* ---------- Today hero: the player bar is a dark emerald tile ---------- */
+.player-bar {
+  background: linear-gradient(135deg, rgba(15, 74, 55, 0.95), rgba(5, 26, 19, 0.95));
+  border: 1px solid rgba(217, 164, 65, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 20px 48px rgba(0, 0, 0, 0.42);
+}
+.player-bar .today-header-big { font-size: 44px; color: #FDFCF8; }
+#streakNum, #todayXpTotal {
+  background: var(--gold-grad-text-53);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.player-bar .today-header-sub { color: rgba(253, 252, 248, 0.72); }
+.player-bar .today-header-right .today-header-sub {
+  border-color: rgba(242, 199, 92, 0.6);
+  color: var(--gold-bright);
+  background: rgba(217, 164, 65, 0.12);
+}
+.player-bar .xp-bar { background: rgba(255, 255, 255, 0.16); }
+.player-bar .xp-bar-fill { background: var(--gold-grad-53); }
+
+/* ---------- Quest + tiers: bigger type, gold accents, one dark hero card ---------- */
+.quest-card { border-top: 3px solid var(--gold-rich); }
+.quest-kicker {
+  color: var(--gold-deep);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 800;
+}
+.quest-title { font-size: 24px; }
+.tier-title { font-size: 24px; }
+.tier-kicker { color: var(--gold-deep); letter-spacing: 0.09em; }
+.tier-list::before {
+  background: linear-gradient(180deg, var(--gold-rich), var(--gold-deep));
+}
+#tierSabaq {
+  background: linear-gradient(135deg, rgba(15, 74, 55, 0.95), rgba(5, 26, 19, 0.95));
+  border: 1px solid rgba(217, 164, 65, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 20px 48px rgba(0, 0, 0, 0.42);
+}
+#tierSabaq .tier-kicker { color: var(--gold-bright); }
+#tierSabaq .tier-title { color: #FDFCF8; }
+#tierSabaq .tier-sub { color: rgba(253, 252, 248, 0.72); }
+#tierSabaq .ring-track { stroke: rgba(255, 255, 255, 0.22); }
+#tierSabaq .ring-num { fill: #FDFCF8; }
+
+/* ---------- Buttons: richer gold primary, solid white ghost ---------- */
+.primary-btn {
+  background: var(--gold-grad-53);
+  font-size: 19px;
+  min-height: 60px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -2px 6px rgba(138, 109, 31, 0.35),
+    0 12px 32px rgba(217, 164, 65, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1.5px solid rgba(27, 27, 24, 0.25);
+}
+.mic-btn {
+  border: 2px solid rgba(217, 164, 65, 0.65);
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.28),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.45),
+    0 0 0 6px rgba(217, 164, 65, 0.12),
+    0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Dock FIX: dark emerald glass, 0.94 alpha — no more ghost text ---------- */
+.bottom-nav {
+  background: rgba(7, 31, 23, 0.94);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(217, 164, 65, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.nav-btn { color: rgba(253, 252, 248, 0.55); }
+.nav-btn.is-active { color: var(--gold-bright); }
+.nav-btn.is-active::after {
+  background: var(--gold-grad-53);
+  width: 28px;
+  height: 5px;
+}
+.playback-bar { background: rgba(255, 255, 255, 0.9); }
+
+/* ---------- Mushaf: the Arabic stays on an opaque paper page ---------- */
+.mushaf-flow {
+  background: var(--paper);
+  border-radius: 24px;
+  padding: 22px 18px;
+  margin-top: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.back-btn { color: #FDFCF8; }
+.read-surah-ar { color: #FDFCF8; font-size: 36px; }
+.read-surah-en { color: #FDFCF8; font-size: 24px; }
+.read-surah-meta { color: rgba(253, 252, 248, 0.68); }
+.bismillah { color: var(--gold-bright); }
+.warsh-note { color: var(--gold-bright); }
+
+/* ---------- Labels that sit on the dark canvas ---------- */
+.lesson-level-label { color: #FDFCF8; }
+.lesson-level-note { color: rgba(253, 252, 248, 0.68); }
+.time-split { color: rgba(253, 252, 248, 0.68); }
+.stepper-val { color: #FDFCF8; }
+.due-strip-text { color: #FDFCF8; }
+.no-results { color: rgba(253, 252, 248, 0.7); }
+.juz-legend { color: rgba(253, 252, 248, 0.7); }
+.path-line { color: var(--gold-bright); }
+.stat-num {
+  font-size: 30px;
+  background: var(--gold-grad-text-53);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.xp-total {
+  font-size: 34px;
+  background: var(--gold-grad-text-53);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.juz-tile { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
+.juz-tile.is-current {
+  border-color: var(--gold-rich);
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.5), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Pills on the dark canvas: dark glass, gold when on ---------- */
+.level-btn, .cap-mode, .cap-font, .time-btn, .stepper-btn {
+  background: rgba(255, 255, 255, 0.10);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #FDFCF8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.level-btn.is-on, .cap-mode.is-on, .cap-font.is-on,
+.time-btn.is-selected {
+  background: var(--gold-grad-53);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #1B1B18;
+}
+
+/* ---------- Live screen copy on the dark canvas ---------- */
+.stage-close {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #FDFCF8;
+  background: rgba(255, 255, 255, 0.08);
+}
+.stage-qiraat { border-color: rgba(255, 255, 255, 0.35); }
+.stage-qiraat-btn { color: #FDFCF8; }
+.stage-qiraat-btn.is-on {
+  background: var(--gold-grad-53);
+  color: #1B1B18;
+}
+.live-ayah, .live-surah, .live-score { color: #FDFCF8; }
+.live-verse { color: #FDFCF8; }
+#screen-live .lf-word.is-good, #screen-live .lf-word.is-fixed { color: #E9BC55; }
+#screen-live .lf-word.is-bad { color: #F0856F; }
+.live-honest, .practice-status, .heard-line,
+.cap-mode-note, .cap-teacher-note, .verse-translation {
+  color: rgba(253, 252, 248, 0.68);
+}
+.cap-fonts-label { color: #FDFCF8; }
+
+/* ---------- Sheets stay the strongest light glass ---------- */
+.sheet { background: rgba(253, 252, 248, 0.94); }
+.sheet .read-settings, .sheet .sheet-note { background: rgba(255, 255, 255, 0.7); }
+
+/* ---------- Desktop: the app panel is dark glass, not a white pane ---------- */
+@media (min-width: 760px) {
+  .app {
+    background: rgba(5, 26, 19, 0.80);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 24px 60px rgba(0, 0, 0, 0.4);
+  }
+}
